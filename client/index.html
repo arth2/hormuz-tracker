@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hormuz Crisis Tracker</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛢️</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-title">HORMUZ CRISIS TRACKER</div>
+  <div class="header-meta">
+    <span>Baseline: Feb 27, 2026 &middot; Brent then: $71/bbl</span>
+    <span>Crisis began: Feb 28, 2026 (Operation Epic Fury)</span>
+    <span id="day-counter">Day &mdash; of closure</span>
+    <span id="last-updated">Updating...</span>
+  </div>
+</header>
+
+<!-- DEFICIT HERO SECTION -->
+<section id="deficit-section" class="panel-full">
+  <h2>THE DEFICIT</h2>
+  <div class="deficit-cards">
+    <div class="card" id="card-today-deficit">
+      <div class="card-label">TODAY'S ESTIMATE</div>
+      <div class="card-value" id="val-today-deficit">&mdash;</div>
+      <div class="card-unit">mb/d missing</div>
+    </div>
+    <div class="card" id="card-cumulative">
+      <div class="card-label">CUMULATIVE BACKLOG</div>
+      <div class="card-value" id="val-cumulative">&mdash;</div>
+      <div class="card-unit">million barrels since Feb 28</div>
+    </div>
+    <div class="card card-hero" id="card-dollar-value">
+      <div class="card-label">DOLLAR VALUE</div>
+      <div class="card-value" id="val-dollar">&mdash;</div>
+      <div class="card-unit" id="val-dollar-brent">at $&mdash;/bbl Brent</div>
+    </div>
+  </div>
+  <div class="deficit-charts">
+    <div class="chart-container">
+      <div class="chart-title">AIS TANKER COUNT &mdash; STRAIT OF HORMUZ <span class="badge">Daily proxy</span></div>
+      <canvas id="chart-ais"></canvas>
+    </div>
+    <div class="chart-container">
+      <div class="chart-title">CUMULATIVE SUPPLY DEFICIT (million barrels)</div>
+      <canvas id="chart-deficit"></canvas>
+    </div>
+  </div>
+  <div class="shutin-section">
+    <div class="chart-title">ESTIMATED CURTAILMENT BY COUNTRY (mb/d)</div>
+    <canvas id="chart-shutin"></canvas>
+  </div>
+</section>
+
+<!-- MARKET GRID: 2x2 -->
+<div class="market-grid">
+  <section class="panel" id="panel-oil">
+    <h3>OIL & ENERGY PRICES <span class="freshness-badge">Live &middot; 15-min delay</span></h3>
+    <div id="table-oil" class="data-table"></div>
+  </section>
+  <section class="panel" id="panel-markets">
+    <h3>FINANCIAL MARKETS <span class="freshness-badge">Live &middot; 15-min delay</span></h3>
+    <div id="table-markets" class="data-table"></div>
+  </section>
+  <section class="panel" id="panel-commodities">
+    <h3>COMMODITIES & CRYPTO <span class="freshness-badge">Live &middot; 15-min delay</span></h3>
+    <div id="table-commodities" class="data-table"></div>
+  </section>
+  <section class="panel" id="panel-logistics">
+    <h3>LOGISTICS & SHIPPING <span class="freshness-badge">Updated weekly</span></h3>
+    <div id="table-logistics" class="data-table"></div>
+  </section>
+</div>
+
+<!-- US DOMESTIC ENERGY — FULL WIDTH -->
+<section class="panel panel-full" id="panel-us-energy">
+  <h3>U.S. DOMESTIC ENERGY PRICES <span class="freshness-badge">Weekly / Monthly EIA data</span></h3>
+  <div id="table-us-energy" class="data-table"></div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  Data sources: EIA &middot; IEA &middot; Yahoo Finance &middot; FRED &middot; Drewry &middot; DAT &middot; VesselFinder (AIS proxy) &middot;
+  All deltas vs. Feb 27, 2026 baseline &middot; AIS tanker count is a directional proxy, not official data
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="app.js"></script>
+</body>
+</html>
