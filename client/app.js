@@ -285,7 +285,7 @@ function buildTableHTML(headers, rows) {
 function renderTickerTable(category, containerId, batchPrices) {
   const tickers = LIVE_TICKERS[category];
   const container = document.getElementById(containerId);
-  const headers = ['', 'CURRENT', 'PRE-CRISIS', '% CHANGE', 'UNIT'];
+  const headers = ['', 'CURRENT', 'AT BASELINE', 'PRE-CRISIS', '% CHANGE', 'UNIT'];
 
   const rows = tickers.map(t => {
     const baseline = BASELINES[t.key];
@@ -301,11 +301,13 @@ function renderTickerTable(category, containerId, batchPrices) {
 
     const currentStr = price != null ? formatNumber(price, 2) : '&mdash;';
     const noteStr = isBaseline ? ' <span style="color:var(--amber);font-size:0.6rem">(baseline)</span>' : '';
+    const atBaselineStr = isBaseline ? '<span style="color:var(--amber)">Yes</span>' : '&mdash;';
     const preCrisisStr = baseline != null ? formatNumber(baseline, 2) : '&mdash;';
-    const pctStr = price != null && baseline != null ? formatPercentChange(price, baseline) : '<span class="delta neutral">&mdash;</span>';
+    const pctStr = price != null && baseline != null && !isBaseline ? formatPercentChange(price, baseline) : '<span class="delta neutral">&mdash;</span>';
     return [
       `<td class="label-cell">${t.label}</td>`,
       `<td class="value-cell">${currentStr}${noteStr}</td>`,
+      `<td class="value-cell">${atBaselineStr}</td>`,
       `<td class="value-cell">${preCrisisStr}</td>`,
       `<td class="delta-cell">${pctStr}</td>`,
       `<td class="unit-cell">${t.unit}</td>`,
@@ -317,12 +319,13 @@ function renderTickerTable(category, containerId, batchPrices) {
 
 async function loadAllLiveTickers() {
   // Show loading state for all panels
-  const headers = ['', 'CURRENT', 'PRE-CRISIS', '% CHANGE', 'UNIT'];
+  const headers = ['', 'CURRENT', 'AT BASELINE', 'PRE-CRISIS', '% CHANGE', 'UNIT'];
   for (const [category, containerId] of [['oil', 'table-oil'], ['markets', 'table-markets'], ['commodities', 'table-commodities']]) {
     const container = document.getElementById(containerId);
     const loadingRows = LIVE_TICKERS[category].map(t => [
       `<td class="label-cell">${t.label}</td>`,
       `<td class="value-cell loading-cell">loading...</td>`,
+      `<td class="value-cell">&mdash;</td>`,
       `<td class="value-cell">&mdash;</td>`,
       `<td class="delta-cell">&mdash;</td>`,
       `<td class="unit-cell">${t.unit}</td>`,
