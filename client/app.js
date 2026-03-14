@@ -295,16 +295,26 @@ async function loadLiveTickers(category, containerId) {
   for (const t of tickers) {
     const data = await fetchJSON(`/api/live/${encodeURIComponent(t.ticker)}`);
     results.push({ ...t, price: data?.price ?? null });
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 300));
   }
 
   const rows = results.map(t => {
     const baseline = BASELINES[t.key];
-    const priceStr = t.price != null ? formatNumber(t.price, 2) : '&mdash;';
-    const deltaStr = t.price != null ? formatDelta(t.price, baseline) : '<span class="delta neutral">&mdash;</span>';
+    let price = t.price;
+    let isBaseline = false;
+
+    // Fall back to baseline if live fetch failed
+    if (price == null && baseline != null) {
+      price = baseline;
+      isBaseline = true;
+    }
+
+    const priceStr = price != null ? formatNumber(price, 2) : '&mdash;';
+    const deltaStr = price != null && !isBaseline ? formatDelta(price, baseline) : '<span class="delta neutral">&mdash;</span>';
+    const noteStr = isBaseline ? ' <span style="color:var(--amber);font-size:0.6rem">(baseline)</span>' : '';
     return [
       `<td class="label-cell">${t.label}</td>`,
-      `<td class="value-cell">${priceStr}</td>`,
+      `<td class="value-cell">${priceStr}${noteStr}</td>`,
       `<td class="delta-cell">${deltaStr}</td>`,
       `<td class="unit-cell">${t.unit}</td>`,
     ];

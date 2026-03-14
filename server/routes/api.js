@@ -85,17 +85,61 @@ router.get('/baselines', async (req, res) => {
   }
 });
 
-// GET /api/live/:ticker — Yahoo Finance proxy
+// GET /api/live/:ticker — Yahoo Finance proxy with multiple fallback endpoints
+async function fetchYahooPrice(ticker) {
+  const endpoints = [
+    `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}`,
+    `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`,
+  ];
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json',
+  };
+
+  for (const url of endpoints) {
+    try {
+      const response = await axios.get(url, { timeout: 8000, headers });
+      const result = response.data?.chart?.result?.[0];
+      if (result) {
+        return result.meta.regularMarketPrice;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  // Final fallback: try Yahoo Finance download CSV (delayed quotes)
+  try {
+    const csvUrl = `https://query1.finance.yahoo.com/v7/finance/download/${ticker}?period1=${Math.floor(Date.now()/1000) - 86400*5}&period2=${Math.floor(Date.now()/1000)}&interval=1d`;
+    const csvRes = await axios.get(csvUrl, { timeout: 8000, headers });
+    const lines = csvRes.data.trim().split('\n');
+    const lastLine = lines[lines.length - 1];
+    const cols = lastLine.split(',');
+    const closePrice = parseFloat(cols[4]); // Close column
+    if (!isNaN(closePrice)) return closePrice;
+  } catch {
+    // all methods exhausted
+  }
+
+  return null;
+}
+
 router.get('/live/:ticker', liveTickerLimiter, async (req, res) => {
   try {
     const ticker = req.params.ticker;
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`;
-    const response = await axios.get(url, {
-      timeout: 8000,
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-    });
-    const price = response.data.chart.result[0].meta.regularMarketPrice;
-    res.json({ ticker, price, timestamp: new Date() });
+    const price = await fetchYahooPrice(ticker);
+    if (price !== null) {
+      res.json({ ticker, price, timestamp: new Date() });
+    } else {
+      // Fall back to baseline value if available
+      const baseline = await db.query(
+        `SELECT baseline_value FROM baselines WHERE metric_key = (
+          SELECT metric_key FROM baselines LIMIT 0
+        )`
+      ).catch(() => null);
+      console.error(`[api] /live/${ticker}: all Yahoo endpoints failed`);
+      res.status(502).json({ error: 'Failed to fetch live price' });
+    }
   } catch (err) {
     console.error(`[api] /live/${req.params.ticker} error:`, err.message);
     res.status(502).json({ error: 'Failed to fetch live price' });

@@ -62,13 +62,22 @@ async function calculateDeficit() {
 
   // 6. Fetch live Brent for dollar value
   let brent_price;
-  try {
-    const yahooRes = await axios.get(
-      'https://query1.finance.yahoo.com/v8/finance/chart/BZ=F',
-      { timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0' } }
-    );
-    brent_price = yahooRes.data.chart.result[0].meta.regularMarketPrice;
-  } catch {
+  const yahooHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  };
+  for (const domain of ['query2.finance.yahoo.com', 'query1.finance.yahoo.com']) {
+    try {
+      const yahooRes = await axios.get(
+        `https://${domain}/v8/finance/chart/BZ=F`,
+        { timeout: 5000, headers: yahooHeaders }
+      );
+      brent_price = yahooRes.data.chart.result[0].meta.regularMarketPrice;
+      break;
+    } catch {
+      continue;
+    }
+  }
+  if (!brent_price) {
     const storedBrent = await db.query(
       `SELECT value FROM market_snapshots
        WHERE metric_key = 'brent_crude'
