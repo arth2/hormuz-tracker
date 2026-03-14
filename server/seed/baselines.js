@@ -18,6 +18,8 @@ const BASELINES = [
   { key: 'dax',                     value: 22100.0, unit: 'index'     },
   { key: 'nikkei',                  value: 37800.0, unit: 'index'     },
   { key: 'shanghai',                value: 3310.0,  unit: 'index'     },
+  { key: 'kospi',                   value: 2750.0, unit: 'index'     },
+  { key: 'nifty',                   value: 24500.0, unit: 'index'     },
   // Metals
   { key: 'gold',                    value: 2880.0,  unit: '$/oz'      },
   { key: 'silver',                  value: 31.80,   unit: '$/oz'      },

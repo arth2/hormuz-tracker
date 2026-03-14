@@ -32,8 +32,10 @@ const YAHOO_TO_TWELVEDATA = {
   '^GDAXI':    'GDAXI',
   '^N225':     'NI225',
   '000001.SS': '000001',
-  // Metals & Agriculture
-  'GC=F':      'GC',
+  '^KS11':     'KS11',
+  '^NSEI':     'NSEI',
+  // Metals & Agriculture (XAU/USD = gold spot $/oz; GC could resolve to wrong instrument)
+  'GC=F':      'XAU/USD',
   'SI=F':      'SI',
   'HG=F':      'HG',
   'PA=F':      'PA',
