@@ -119,14 +119,14 @@ header {
 
 .card-value {
   font-family: var(--font-mono);
-  font-size: 3rem;
+  font-size: 4rem;
   font-weight: 700;
   line-height: 1.1;
   color: var(--text);
 }
 
 .card-hero .card-value {
-  font-size: 4rem;
+  font-size: 5rem;
   color: var(--red);
 }
 
@@ -255,6 +255,18 @@ header {
   font-style: italic;
 }
 
+/* Config warning banner */
+.config-warning {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  margin-bottom: 0.75rem;
+}
+
 /* FOOTER */
 footer {
   font-size: 0.65rem;
@@ -281,11 +293,11 @@ footer {
   }
 
   .card-value {
-    font-size: 2rem;
+    font-size: 2.5rem;
   }
 
   .card-hero .card-value {
-    font-size: 2.5rem;
+    font-size: 3rem;
   }
 
   header {

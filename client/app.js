@@ -35,10 +35,7 @@ const LIVE_TICKERS = {
 };
 
 const LOGISTICS_KEYS = [
-  { key: 'baltic_dry_index',          label: 'Baltic Dry Index',    unit: 'index' },
-  { key: 'baltic_dirty_tanker_index', label: 'Baltic Dirty Tanker', unit: 'index' },
   { key: 'drewry_wci',                label: 'Drewry WCI',         unit: '$/FEU' },
-  { key: 'dat_dry_van_spot',          label: 'DAT Dry Van Spot',   unit: '$/mile' },
   { key: 'brent_fred_confirm',        label: 'Brent (FRED)',       unit: '$/bbl' },
 ];
 
@@ -276,31 +273,15 @@ function buildTableHTML(headers, rows) {
   return html;
 }
 
-async function loadLiveTickers(category, containerId) {
+function renderTickerTable(category, containerId, batchPrices) {
   const tickers = LIVE_TICKERS[category];
   const container = document.getElementById(containerId);
-
-  // Show loading state
   const headers = ['', 'PRICE', 'VS BASELINE', 'UNIT'];
-  const loadingRows = tickers.map(t => [
-    `<td class="label-cell">${t.label}</td>`,
-    `<td class="value-cell loading-cell">loading...</td>`,
-    `<td class="delta-cell">&mdash;</td>`,
-    `<td class="unit-cell">${t.unit}</td>`,
-  ]);
-  container.innerHTML = buildTableHTML(headers, loadingRows);
 
-  // Fetch each ticker with a small delay to avoid rate limiting
-  const results = [];
-  for (const t of tickers) {
-    const data = await fetchJSON(`/api/live/${encodeURIComponent(t.ticker)}`);
-    results.push({ ...t, price: data?.price ?? null });
-    await new Promise(r => setTimeout(r, 300));
-  }
-
-  const rows = results.map(t => {
+  const rows = tickers.map(t => {
     const baseline = BASELINES[t.key];
-    let price = t.price;
+    const liveData = batchPrices[t.ticker];
+    let price = liveData?.price ?? null;
     let isBaseline = false;
 
     // Fall back to baseline if live fetch failed
@@ -321,6 +302,39 @@ async function loadLiveTickers(category, containerId) {
   });
 
   container.innerHTML = buildTableHTML(headers, rows);
+}
+
+async function loadAllLiveTickers() {
+  // Show loading state for all panels
+  const headers = ['', 'PRICE', 'VS BASELINE', 'UNIT'];
+  for (const [category, containerId] of [['oil', 'table-oil'], ['markets', 'table-markets'], ['commodities', 'table-commodities']]) {
+    const container = document.getElementById(containerId);
+    const loadingRows = LIVE_TICKERS[category].map(t => [
+      `<td class="label-cell">${t.label}</td>`,
+      `<td class="value-cell loading-cell">loading...</td>`,
+      `<td class="delta-cell">&mdash;</td>`,
+      `<td class="unit-cell">${t.unit}</td>`,
+    ]);
+    container.innerHTML = buildTableHTML(headers, loadingRows);
+  }
+
+  // Single batch request for all tickers
+  const data = await fetchJSON('/api/live/batch');
+  const prices = data?.prices || {};
+
+  // Update freshness badges based on cache age
+  if (data?.cacheAge != null) {
+    const age = data.cacheAge;
+    const label = age < 60 ? 'Live' : age < 600 ? `${Math.floor(age / 60)} min delay` : 'Cached';
+    for (const panelId of ['panel-oil', 'panel-markets', 'panel-commodities']) {
+      const badge = document.querySelector(`#${panelId} .freshness-badge`);
+      if (badge) badge.textContent = label;
+    }
+  }
+
+  renderTickerTable('oil', 'table-oil', prices);
+  renderTickerTable('markets', 'table-markets', prices);
+  renderTickerTable('commodities', 'table-commodities', prices);
 }
 
 async function loadSnapshotTable(keys, containerId) {
@@ -364,6 +378,20 @@ async function updateDollarValue() {
   }
 }
 
+// === EIA CONFIGURATION CHECK ===
+
+async function checkConfigStatus() {
+  const status = await fetchJSON('/api/status');
+  if (status && !status.eia_configured) {
+    const panel = document.getElementById('panel-us-energy');
+    const table = panel.querySelector('.data-table');
+    const warning = document.createElement('div');
+    warning.className = 'config-warning';
+    warning.textContent = 'EIA API key not configured. Set EIA_API_KEY in Railway Variables.';
+    panel.insertBefore(warning, table);
+  }
+}
+
 // === INIT ===
 
 async function init() {
@@ -378,21 +406,22 @@ async function init() {
   loadDeficitHistory();
   renderShutinChart();
 
-  // Load live market data panels (with delays between categories)
-  loadLiveTickers('oil', 'table-oil');
-  setTimeout(() => loadLiveTickers('markets', 'table-markets'), 2000);
-  setTimeout(() => loadLiveTickers('commodities', 'table-commodities'), 5000);
+  // Load all live market data panels via batch endpoint
+  await loadAllLiveTickers();
 
   // Load snapshot-based tables
   loadSnapshotTable(LOGISTICS_KEYS, 'table-logistics');
   loadSnapshotTable(US_ENERGY_KEYS, 'table-us-energy');
 
+  // Check configuration status
+  checkConfigStatus();
+
   // Update timestamp
   document.getElementById('last-updated').textContent =
     `Updated: ${new Date().toLocaleTimeString()}`;
 
-  // Refresh dollar value every 60s
-  setInterval(updateDollarValue, 60_000);
+  // Refresh dollar value every 5 minutes (saves API credits)
+  setInterval(updateDollarValue, 5 * 60_000);
 }
 
 init();

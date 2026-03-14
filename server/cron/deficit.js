@@ -62,21 +62,47 @@ async function calculateDeficit() {
 
   // 6. Fetch live Brent for dollar value
   let brent_price;
-  const yahooHeaders = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  };
-  for (const domain of ['query2.finance.yahoo.com', 'query1.finance.yahoo.com']) {
+  let brentSource = 'baseline';
+
+  // Try Twelve Data first (works from cloud IPs)
+  const tdKey = process.env.TWELVE_DATA_API_KEY;
+  if (tdKey) {
     try {
-      const yahooRes = await axios.get(
-        `https://${domain}/v8/finance/chart/BZ=F`,
-        { timeout: 5000, headers: yahooHeaders }
-      );
-      brent_price = yahooRes.data.chart.result[0].meta.regularMarketPrice;
-      break;
+      const tdRes = await axios.get('https://api.twelvedata.com/price', {
+        params: { symbol: 'BZ', apikey: tdKey },
+        timeout: 8000,
+      });
+      const price = parseFloat(tdRes.data?.price);
+      if (!isNaN(price) && price > 0) {
+        brent_price = price;
+        brentSource = 'twelvedata';
+      }
     } catch {
-      continue;
+      // fall through
     }
   }
+
+  // Fallback: Yahoo Finance (works from residential IPs)
+  if (!brent_price) {
+    const yahooHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    };
+    for (const domain of ['query2.finance.yahoo.com', 'query1.finance.yahoo.com']) {
+      try {
+        const yahooRes = await axios.get(
+          `https://${domain}/v8/finance/chart/BZ=F`,
+          { timeout: 5000, headers: yahooHeaders }
+        );
+        brent_price = yahooRes.data.chart.result[0].meta.regularMarketPrice;
+        brentSource = 'yahoo';
+        break;
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  // Final fallback: stored value
   if (!brent_price) {
     const storedBrent = await db.query(
       `SELECT value FROM market_snapshots
@@ -84,6 +110,7 @@ async function calculateDeficit() {
        ORDER BY metric_date DESC LIMIT 1`
     );
     brent_price = storedBrent.rows[0]?.value ? parseFloat(storedBrent.rows[0].value) : 71.0;
+    brentSource = storedBrent.rows[0]?.value ? 'stored' : 'baseline';
   }
 
   // 7. Dollar value
@@ -104,7 +131,8 @@ async function calculateDeficit() {
   `, [today, blended_throughput, daily_deficit_mb, cumulative_deficit_mb,
       brent_price, cumulative_deficit_dollars]);
 
-  console.log(`[deficit] ${today}: deficit=${daily_deficit_mb.toFixed(2)} mb/d, cumulative=${cumulative_deficit_mb.toFixed(1)} mb, $${(cumulative_deficit_dollars / 1e9).toFixed(2)}B`);
+  const blend = ais_count !== null && eia_production_mb !== null ? 'EIA+AIS' : eia_production_mb !== null ? 'EIA-only' : 'fallback';
+  console.log(`[deficit] ${today}: deficit=${daily_deficit_mb.toFixed(2)} mb/d, cumulative=${cumulative_deficit_mb.toFixed(1)} mb, $${(cumulative_deficit_dollars / 1e9).toFixed(2)}B (blend=${blend}, brent=${brentSource})`);
 }
 
 module.exports = { calculateDeficit };

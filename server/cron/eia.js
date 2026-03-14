@@ -38,9 +38,11 @@ async function runEIA() {
   }
 
   console.log(`[eia] Starting EIA fetch at ${new Date().toISOString()}`);
+  let successCount = 0;
 
   for (const series of EIA_SERIES) {
     let attempts = 0;
+    let fetched = false;
     while (attempts < 2) {
       try {
         const data = await fetchSeries(series, apiKey);
@@ -57,6 +59,8 @@ async function runEIA() {
         );
 
         console.log(`[eia] ${series.key}: ${value} ${series.unit} (${metricDate})`);
+        successCount++;
+        fetched = true;
         break;
       } catch (err) {
         attempts++;
@@ -68,9 +72,20 @@ async function runEIA() {
         }
       }
     }
+
+    // After retry failure, use previous stored value
+    if (!fetched) {
+      const prev = await db.query(
+        `SELECT value, metric_date FROM market_snapshots WHERE metric_key = $1 ORDER BY metric_date DESC LIMIT 1`,
+        [series.key]
+      ).catch(() => ({ rows: [] }));
+      if (prev.rows[0]) {
+        console.log(`[eia] ${series.key}: using previous value ${prev.rows[0].value} from ${prev.rows[0].metric_date}`);
+      }
+    }
   }
 
-  console.log(`[eia] Completed at ${new Date().toISOString()}`);
+  console.log(`[eia] Completed: ${successCount}/${EIA_SERIES.length} series fetched at ${new Date().toISOString()}`);
 }
 
 module.exports = { runEIA };

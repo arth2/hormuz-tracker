@@ -3,8 +3,6 @@ const cheerio = require('cheerio');
 const db = require('../db');
 
 const FRED_SERIES = [
-  { key: 'baltic_dry_index',          fredId: 'BDIY',          unit: 'index' },
-  { key: 'baltic_dirty_tanker_index', fredId: 'BDTI',          unit: 'index' },
   { key: 'brent_fred_confirm',        fredId: 'DCOILBRENTEU',  unit: '$/bbl' },
 ];
 
@@ -85,49 +83,10 @@ async function fetchDrewry() {
   }
 }
 
-async function fetchDAT() {
-  console.log('[logistics] Fetching DAT spot rate...');
-  try {
-    const url = 'https://www.dat.com/industry-trends/truckload-market-alerts';
-    const response = await axios.get(url, {
-      timeout: 15000,
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-    });
-    const $ = cheerio.load(response.data);
-
-    // Look for dry van spot rate ($/mile)
-    let spotRate = null;
-    const pageText = $('body').text();
-    const match = pageText.match(/(?:dry\s*van|van)\s*(?:spot)?\s*(?:rate)?[:\s]*\$?\s*(\d+\.?\d*)\s*(?:per\s+mile|\/\s*mi)/i)
-      || pageText.match(/\$\s*(\d+\.\d{2})\s*(?:per\s+mile|\/\s*mi)/i);
-
-    if (match) {
-      spotRate = parseFloat(match[1]);
-    }
-
-    if (spotRate !== null && !isNaN(spotRate)) {
-      const today = new Date().toISOString().split('T')[0];
-      await db.query(
-        `INSERT INTO market_snapshots (metric_key, metric_date, value, unit, source)
-         VALUES ('dat_dry_van_spot', $1, $2, '$/mile', 'dat')
-         ON CONFLICT (metric_key, metric_date) DO UPDATE SET
-           value = EXCLUDED.value`,
-        [today, spotRate]
-      );
-      console.log(`[logistics] dat_dry_van_spot: $${spotRate}/mile`);
-    } else {
-      console.log('[logistics] Could not parse DAT spot rate');
-    }
-  } catch (err) {
-    console.error('[logistics] DAT scrape failed:', err.message);
-  }
-}
-
 async function runLogistics() {
   console.log(`[logistics] Starting logistics fetch at ${new Date().toISOString()}`);
   await fetchFRED();
   await fetchDrewry();
-  await fetchDAT();
   console.log(`[logistics] Completed at ${new Date().toISOString()}`);
 }
 
