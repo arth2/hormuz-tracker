@@ -66,6 +66,15 @@ function formatDelta(current, baseline) {
   return `<span class="delta ${cls}">${sign}${delta.toFixed(2)} (${sign}${pct}%)</span>`;
 }
 
+function formatPercentChange(current, baseline) {
+  if (current == null || baseline == null || baseline === 0) return '<span class="delta neutral">&mdash;</span>';
+  const delta = current - baseline;
+  const pct = ((delta / baseline) * 100).toFixed(2);
+  const sign = delta >= 0 ? '+' : '';
+  const cls = delta >= 0 ? 'positive' : 'negative';
+  return `<span class="delta ${cls}">${sign}${pct}%</span>`;
+}
+
 function formatNumber(val, decimals) {
   if (val == null) return '&mdash;';
   const n = parseFloat(val);
@@ -276,7 +285,7 @@ function buildTableHTML(headers, rows) {
 function renderTickerTable(category, containerId, batchPrices) {
   const tickers = LIVE_TICKERS[category];
   const container = document.getElementById(containerId);
-  const headers = ['', 'PRICE', 'VS BASELINE', 'UNIT'];
+  const headers = ['', 'CURRENT', 'PRE-CRISIS', '% CHANGE', 'UNIT'];
 
   const rows = tickers.map(t => {
     const baseline = BASELINES[t.key];
@@ -290,13 +299,15 @@ function renderTickerTable(category, containerId, batchPrices) {
       isBaseline = true;
     }
 
-    const priceStr = price != null ? formatNumber(price, 2) : '&mdash;';
-    const deltaStr = price != null && !isBaseline ? formatDelta(price, baseline) : '<span class="delta neutral">&mdash;</span>';
+    const currentStr = price != null ? formatNumber(price, 2) : '&mdash;';
     const noteStr = isBaseline ? ' <span style="color:var(--amber);font-size:0.6rem">(baseline)</span>' : '';
+    const preCrisisStr = baseline != null ? formatNumber(baseline, 2) : '&mdash;';
+    const pctStr = price != null && baseline != null ? formatPercentChange(price, baseline) : '<span class="delta neutral">&mdash;</span>';
     return [
       `<td class="label-cell">${t.label}</td>`,
-      `<td class="value-cell">${priceStr}${noteStr}</td>`,
-      `<td class="delta-cell">${deltaStr}</td>`,
+      `<td class="value-cell">${currentStr}${noteStr}</td>`,
+      `<td class="value-cell">${preCrisisStr}</td>`,
+      `<td class="delta-cell">${pctStr}</td>`,
       `<td class="unit-cell">${t.unit}</td>`,
     ];
   });
@@ -306,12 +317,13 @@ function renderTickerTable(category, containerId, batchPrices) {
 
 async function loadAllLiveTickers() {
   // Show loading state for all panels
-  const headers = ['', 'PRICE', 'VS BASELINE', 'UNIT'];
+  const headers = ['', 'CURRENT', 'PRE-CRISIS', '% CHANGE', 'UNIT'];
   for (const [category, containerId] of [['oil', 'table-oil'], ['markets', 'table-markets'], ['commodities', 'table-commodities']]) {
     const container = document.getElementById(containerId);
     const loadingRows = LIVE_TICKERS[category].map(t => [
       `<td class="label-cell">${t.label}</td>`,
       `<td class="value-cell loading-cell">loading...</td>`,
+      `<td class="value-cell">&mdash;</td>`,
       `<td class="delta-cell">&mdash;</td>`,
       `<td class="unit-cell">${t.unit}</td>`,
     ]);
