@@ -301,10 +301,156 @@ router.get('/live/:ticker', liveTickerLimiter, async (req, res) => {
 router.get('/status', (req, res) => {
   const eiaKey = process.env.EIA_API_KEY;
   const tdKey = process.env.TWELVE_DATA_API_KEY;
+  const firmsKey = process.env.FIRMS_MAP_KEY;
   res.json({
     eia_configured: !!(eiaKey && eiaKey !== 'your_key_here'),
     twelvedata_configured: !!tdKey,
+    firms_configured: !!(firmsKey && firmsKey !== 'your_key_here'),
   });
+});
+
+// ─────────────────────────────────────────────
+// FLARING ENDPOINTS
+// ─────────────────────────────────────────────
+const { FLARING_REGIONS, GULF_INDEX_TOTAL_WEIGHT } = require('../cron/flaring');
+
+// GET /api/flaring/regions
+router.get('/flaring/regions', async (req, res) => {
+  try {
+    const baselines = await db.query('SELECT * FROM flaring_baselines');
+    const blMap = Object.fromEntries(baselines.rows.map(r => [r.region_key, r]));
+    const regions = FLARING_REGIONS.map(r => ({
+      ...r,
+      baseline_frp: blMap[r.key]?.baseline_frp ?? null,
+    }));
+    res.json(regions);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch region metadata' });
+  }
+});
+
+// GET /api/flaring/index/daily — MUST be before /:regionKey
+router.get('/flaring/index/daily', async (req, res) => {
+  try {
+    const from = req.query.from || '2026-02-28';
+
+    const rows = await db.query(`
+      SELECT date, region_key, pct_of_baseline
+      FROM flaring_data
+      WHERE date >= $1 AND pct_of_baseline IS NOT NULL
+      ORDER BY date ASC
+    `, [from]);
+
+    const byDate = {};
+    rows.rows.forEach(r => {
+      const dateStr = r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date;
+      if (!byDate[dateStr]) byDate[dateStr] = {};
+      byDate[dateStr][r.region_key] = parseFloat(r.pct_of_baseline);
+    });
+
+    const weightMap = Object.fromEntries(FLARING_REGIONS.map(r => [r.key, r.weight]));
+
+    const indexSeries = Object.entries(byDate).map(([date, regionPcts]) => {
+      let weightedSum = 0;
+      let appliedWeight = 0;
+      for (const [key, pct] of Object.entries(regionPcts)) {
+        const w = weightMap[key] || 0;
+        weightedSum += pct * w;
+        appliedWeight += w;
+      }
+      return {
+        date,
+        index_value: appliedWeight > 0 ? (weightedSum / appliedWeight).toFixed(1) : null,
+        component_coverage: `${Object.keys(regionPcts).length}/${FLARING_REGIONS.length} regions`,
+        components: regionPcts,
+      };
+    });
+
+    res.json(indexSeries);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to compute index' });
+  }
+});
+
+// GET /api/flaring/:regionKey?from=YYYY-MM-DD
+router.get('/flaring/:regionKey', async (req, res) => {
+  try {
+    const { regionKey } = req.params;
+    const from = req.query.from || '2026-02-28';
+
+    const region = FLARING_REGIONS.find(r => r.key === regionKey);
+    if (!region) return res.status(404).json({ error: 'Unknown region key' });
+
+    const data = await db.query(`
+      SELECT date, frp_sum, hotspot_count, rolling_avg_7d, pct_of_baseline, baseline_frp
+      FROM flaring_data
+      WHERE region_key = $1 AND date >= $2
+      ORDER BY date ASC
+    `, [regionKey, from]);
+
+    const baseline = await db.query(
+      'SELECT baseline_frp FROM flaring_baselines WHERE region_key = $1',
+      [regionKey]
+    );
+
+    res.json({
+      region: region,
+      baseline_frp: baseline.rows[0]?.baseline_frp ?? null,
+      data: data.rows,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch flaring data' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// INTELLIGENCE FEED ENDPOINTS
+// ─────────────────────────────────────────────
+
+// GET /api/intelligence?category=SHIPPING&limit=40&offset=0
+router.get('/intelligence', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 40, 100);
+    const offset = parseInt(req.query.offset) || 0;
+    const category = req.query.category;
+
+    let query = `SELECT id, source, source_url, headline, summary, metric_extracted,
+                        published_at, fetched_at, category, relevance_score
+                 FROM intelligence_feed
+                 WHERE is_duplicate = FALSE`;
+    const params = [];
+
+    if (category) {
+      params.push(category.toUpperCase());
+      query += ` AND category = $${params.length}`;
+    }
+
+    query += ` ORDER BY relevance_score DESC, fetched_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit);
+    params.push(offset);
+
+    const result = await db.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch intelligence feed' });
+  }
+});
+
+// GET /api/intelligence/latest — count of items added in last 6 hours (for badge)
+router.get('/intelligence/latest', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT COUNT(*) as count FROM intelligence_feed
+       WHERE fetched_at > NOW() - INTERVAL '6 hours' AND is_duplicate = FALSE`
+    );
+    res.json({ count: parseInt(result.rows[0].count) });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch count' });
+  }
 });
 
 // Admin manual triggers
@@ -347,6 +493,33 @@ router.post('/admin/run-deficit', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+const { runFlaring } = require('../cron/flaring');
+const { runIntelligence } = require('../cron/intelligence');
+
+router.post('/admin/run-flaring', async (req, res) => {
+  try {
+    await runFlaring();
+    res.json({ status: 'ok', job: 'flaring' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/admin/run-intelligence', async (req, res) => {
+  try {
+    await runIntelligence();
+    res.json({ status: 'ok', job: 'intelligence' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/admin/seed-flaring-baseline', async (req, res) => {
+  // Run in background — this takes a few minutes
+  require('../seed/flaring_baseline').seedBaseline().catch(console.error);
+  res.json({ ok: true, message: 'Baseline seeding started in background. Check server logs.' });
 });
 
 module.exports = router;
