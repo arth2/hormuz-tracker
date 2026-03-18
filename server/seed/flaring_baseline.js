@@ -14,25 +14,48 @@ function parseVIIRSCsv(text) {
   }).filter(r => r.latitude); // skip empty rows
 }
 
+// FIRMS API limits area queries to 5 days max per request.
+// To cover 27 days (Feb 1-27), we batch into 5-day chunks.
 async function fetchArchive(bbox) {
-  // FIRMS API area query with date range
-  // Format: /api/area/csv/{MAP_KEY}/{source}/{area}/{day_range}/{date}
-  // date = YYYY-MM-DD of the start date; day_range = number of days
-  const archiveUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${process.env.FIRMS_MAP_KEY}/VIIRS_SNPP_SP/${bbox}/27/2026-02-01`;
-  console.log(`[seed/flaring] Fetching: ${archiveUrl.replace(process.env.FIRMS_MAP_KEY, '***')}`);
-  try {
-    const response = await axios.get(archiveUrl, {
-      timeout: 60000,
-      headers: { 'User-Agent': 'HormuzTracker/1.0' }
-    });
-    return parseVIIRSCsv(response.data);
-  } catch (err) {
-    // Log response body for debugging 400/403 errors
-    if (err.response) {
-      console.error(`[seed/flaring] FIRMS API error ${err.response.status}: ${JSON.stringify(err.response.data).substring(0, 500)}`);
+  const startDate = new Date('2026-02-01');
+  const totalDays = 27;
+  const maxPerQuery = 5;
+  let allRows = [];
+
+  for (let offset = 0; offset < totalDays; offset += maxPerQuery) {
+    const chunkStart = new Date(startDate);
+    chunkStart.setDate(startDate.getDate() + offset);
+    const remaining = totalDays - offset;
+    const chunkDays = Math.min(maxPerQuery, remaining);
+    const dateStr = chunkStart.toISOString().split('T')[0];
+
+    // Format: /api/area/csv/{MAP_KEY}/{source}/{area}/{day_range}/{date}
+    const archiveUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${process.env.FIRMS_MAP_KEY}/VIIRS_SNPP_SP/${bbox}/${chunkDays}/${dateStr}`;
+    console.log(`[seed/flaring] Fetching: days ${offset+1}-${offset+chunkDays} — ${archiveUrl.replace(process.env.FIRMS_MAP_KEY, '***')}`);
+
+    try {
+      const response = await axios.get(archiveUrl, {
+        timeout: 60000,
+        headers: { 'User-Agent': 'HormuzTracker/1.0' }
+      });
+      const rows = parseVIIRSCsv(response.data);
+      allRows = allRows.concat(rows);
+      console.log(`[seed/flaring]   → ${rows.length} detections`);
+    } catch (err) {
+      if (err.response) {
+        console.error(`[seed/flaring] FIRMS API error ${err.response.status}: ${JSON.stringify(err.response.data).substring(0, 500)}`);
+      }
+      throw err;
     }
-    throw err;
+
+    // Small delay between requests to be polite to the API
+    if (offset + maxPerQuery < totalDays) {
+      await new Promise(r => setTimeout(r, 1500));
+    }
   }
+
+  console.log(`[seed/flaring] Total detections for bbox ${bbox}: ${allRows.length}`);
+  return allRows;
 }
 
 async function seedBaseline() {
