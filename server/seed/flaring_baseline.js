@@ -30,7 +30,8 @@ async function fetchArchive(bbox) {
     const dateStr = chunkStart.toISOString().split('T')[0];
 
     // Format: /api/area/csv/{MAP_KEY}/{source}/{area}/{day_range}/{date}
-    const archiveUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${process.env.FIRMS_MAP_KEY}/VIIRS_SNPP_SP/${bbox}/${chunkDays}/${dateStr}`;
+    // Use NRT (near-real-time) — SP (standard product) has 2-3 month processing lag
+    const archiveUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${process.env.FIRMS_MAP_KEY}/VIIRS_SNPP_NRT/${bbox}/${chunkDays}/${dateStr}`;
     console.log(`[seed/flaring] Fetching: days ${offset+1}-${offset+chunkDays} — ${archiveUrl.replace(process.env.FIRMS_MAP_KEY, '***')}`);
 
     try {
@@ -107,7 +108,7 @@ async function seedBaseline() {
         const pct = (agg.frp / baseline_frp) * 100;
         await db.query(`
           INSERT INTO flaring_data (region_key, date, frp_sum, hotspot_count, baseline_frp, pct_of_baseline, data_source)
-          VALUES ($1, $2, $3, $4, $5, $6, 'SP')
+          VALUES ($1, $2, $3, $4, $5, $6, 'NRT')
           ON CONFLICT (region_key, date) DO NOTHING
         `, [region.key, date, agg.frp, agg.count, baseline_frp, pct]);
       }
