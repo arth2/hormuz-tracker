@@ -13,24 +13,26 @@ const LIVE_TICKERS = {
     { key: 'heating_oil',    ticker: 'HO=F',     label: 'Heating Oil',   unit: '$/gallon' },
   ],
   markets: [
-    { key: 'sp500',    ticker: '^GSPC',     label: 'S&P 500',   unit: '' },
-    { key: 'nasdaq',   ticker: '^IXIC',     label: 'Nasdaq',    unit: '' },
-    { key: 'dow',      ticker: '^DJI',      label: 'Dow Jones', unit: '' },
-    { key: 'ftse',     ticker: '^FTSE',     label: 'FTSE 100',  unit: '' },
-    { key: 'dax',      ticker: '^GDAXI',    label: 'DAX',       unit: '' },
-    { key: 'nikkei',   ticker: '^N225',     label: 'Nikkei',    unit: '' },
-    { key: 'shanghai', ticker: '000001.SS', label: 'Shanghai',  unit: '' },
+    { key: 'sp500',    ticker: '^GSPC',     label: 'S&P 500',        unit: '' },
+    { key: 'nasdaq',   ticker: '^IXIC',     label: 'Nasdaq',         unit: '' },
+    { key: 'dow',      ticker: '^DJI',      label: 'Dow Jones',      unit: '' },
+    { key: 'ftse',     ticker: '^FTSE',     label: 'FTSE 100 (UK)',  unit: '' },
+    { key: 'dax',      ticker: '^GDAXI',    label: 'DAX (Germany)',  unit: '' },
+    { key: 'nikkei',   ticker: '^N225',     label: 'Nikkei (Japan)', unit: '' },
+    { key: 'shanghai', ticker: '000001.SS', label: 'Shanghai (China)', unit: '' },
+    { key: 'kospi',    ticker: '^KS11',     label: 'KOSPI (South Korea)', unit: '' },
+    { key: 'nifty',    ticker: '^NSEI',     label: 'Nifty 50 (India)', unit: '' },
   ],
   commodities: [
-    { key: 'gold',      ticker: 'GC=F',    label: 'Gold',      unit: '$/oz'     },
-    { key: 'silver',    ticker: 'SI=F',    label: 'Silver',    unit: '$/oz'     },
-    { key: 'copper',    ticker: 'HG=F',    label: 'Copper',    unit: '$/lb'     },
-    { key: 'palladium', ticker: 'PA=F',    label: 'Palladium', unit: '$/oz'     },
-    { key: 'wheat',     ticker: 'ZW=F',    label: 'Wheat',     unit: '$/bushel' },
-    { key: 'corn',      ticker: 'ZC=F',    label: 'Corn',      unit: '$/bushel' },
-    { key: 'soybeans',  ticker: 'ZS=F',    label: 'Soybeans',  unit: '$/bushel' },
-    { key: 'bitcoin',   ticker: 'BTC-USD', label: 'Bitcoin',   unit: '$/BTC'    },
-    { key: 'ethereum',  ticker: 'ETH-USD', label: 'Ethereum',  unit: '$/ETH'    },
+    { key: 'gold',      ticker: 'GC=F',    label: 'Gold (GC=F)',      unit: '$/oz'     },
+    { key: 'silver',    ticker: 'SI=F',    label: 'Silver (SI=F)',    unit: '$/oz'     },
+    { key: 'copper',    ticker: 'HG=F',    label: 'Copper (HG=F)',    unit: '$/lb'     },
+    { key: 'palladium', ticker: 'PA=F',    label: 'Palladium (PA=F)', unit: '$/oz'     },
+    { key: 'wheat',     ticker: 'ZW=F',    label: 'Wheat (ZW=F)',     unit: '$/bushel' },
+    { key: 'corn',      ticker: 'ZC=F',    label: 'Corn (ZC=F)',      unit: '$/bushel' },
+    { key: 'soybeans',  ticker: 'ZS=F',    label: 'Soybeans (ZS=F)',  unit: '$/bushel' },
+    { key: 'bitcoin',   ticker: 'BTC-USD', label: 'Bitcoin (BTC-USD)', unit: '$/BTC'    },
+    { key: 'ethereum',  ticker: 'ETH-USD', label: 'Ethereum (ETH-USD)', unit: '$/ETH'    },
   ],
 };
 
@@ -64,6 +66,15 @@ function formatDelta(current, baseline) {
   const sign = delta >= 0 ? '+' : '';
   const cls = delta >= 0 ? 'positive' : 'negative';
   return `<span class="delta ${cls}">${sign}${delta.toFixed(2)} (${sign}${pct}%)</span>`;
+}
+
+function formatPercentChange(current, baseline) {
+  if (current == null || baseline == null || baseline === 0) return '<span class="delta neutral">&mdash;</span>';
+  const delta = current - baseline;
+  const pct = ((delta / baseline) * 100).toFixed(2);
+  const sign = delta >= 0 ? '+' : '';
+  const cls = delta >= 0 ? 'positive' : 'negative';
+  return `<span class="delta ${cls}">${sign}${pct}%</span>`;
 }
 
 function formatNumber(val, decimals) {
@@ -276,7 +287,7 @@ function buildTableHTML(headers, rows) {
 function renderTickerTable(category, containerId, batchPrices) {
   const tickers = LIVE_TICKERS[category];
   const container = document.getElementById(containerId);
-  const headers = ['', 'PRICE', 'VS BASELINE', 'UNIT'];
+  const headers = ['', 'CURRENT', 'AT BASELINE', 'PRE-CRISIS', '% CHANGE', 'UNIT'];
 
   const rows = tickers.map(t => {
     const baseline = BASELINES[t.key];
@@ -290,13 +301,17 @@ function renderTickerTable(category, containerId, batchPrices) {
       isBaseline = true;
     }
 
-    const priceStr = price != null ? formatNumber(price, 2) : '&mdash;';
-    const deltaStr = price != null && !isBaseline ? formatDelta(price, baseline) : '<span class="delta neutral">&mdash;</span>';
+    const currentStr = price != null ? formatNumber(price, 2) : '&mdash;';
     const noteStr = isBaseline ? ' <span style="color:var(--amber);font-size:0.6rem">(baseline)</span>' : '';
+    const atBaselineStr = isBaseline ? '<span style="color:var(--amber)">Yes</span>' : '&mdash;';
+    const preCrisisStr = baseline != null ? formatNumber(baseline, 2) : '&mdash;';
+    const pctStr = price != null && baseline != null && !isBaseline ? formatPercentChange(price, baseline) : '<span class="delta neutral">&mdash;</span>';
     return [
       `<td class="label-cell">${t.label}</td>`,
-      `<td class="value-cell">${priceStr}${noteStr}</td>`,
-      `<td class="delta-cell">${deltaStr}</td>`,
+      `<td class="value-cell">${currentStr}${noteStr}</td>`,
+      `<td class="value-cell">${atBaselineStr}</td>`,
+      `<td class="value-cell">${preCrisisStr}</td>`,
+      `<td class="delta-cell">${pctStr}</td>`,
       `<td class="unit-cell">${t.unit}</td>`,
     ];
   });
@@ -306,12 +321,14 @@ function renderTickerTable(category, containerId, batchPrices) {
 
 async function loadAllLiveTickers() {
   // Show loading state for all panels
-  const headers = ['', 'PRICE', 'VS BASELINE', 'UNIT'];
+  const headers = ['', 'CURRENT', 'AT BASELINE', 'PRE-CRISIS', '% CHANGE', 'UNIT'];
   for (const [category, containerId] of [['oil', 'table-oil'], ['markets', 'table-markets'], ['commodities', 'table-commodities']]) {
     const container = document.getElementById(containerId);
     const loadingRows = LIVE_TICKERS[category].map(t => [
       `<td class="label-cell">${t.label}</td>`,
       `<td class="value-cell loading-cell">loading...</td>`,
+      `<td class="value-cell">&mdash;</td>`,
+      `<td class="value-cell">&mdash;</td>`,
       `<td class="delta-cell">&mdash;</td>`,
       `<td class="unit-cell">${t.unit}</td>`,
     ]);
@@ -392,6 +409,479 @@ async function checkConfigStatus() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// SECTION: WELLHEAD PRODUCTION ACTIVITY (VIIRS FLARING)
+// ═══════════════════════════════════════════════════════════════
+
+// Stores fetched data keyed by region for re-rendering on date change
+const flaringData = {};
+let gulfIndexChart = null;
+
+// ─── UI helpers ──────────────────────────────────────────────────────────────
+
+function toggleSection(sectionId) {
+  const section = document.getElementById(sectionId);
+  if (!section) return;
+  section.classList.toggle('expanded');
+  const toggle = document.getElementById(`toggle-${sectionId}`);
+  if (toggle) toggle.textContent = section.classList.contains('expanded') ? '\u25BC' : '\u25B6';
+}
+
+function toggleTooltip(tooltipId) {
+  document.querySelectorAll('.info-tooltip').forEach(t => {
+    if (t.id !== tooltipId) t.classList.remove('visible');
+  });
+  document.getElementById(tooltipId)?.classList.toggle('visible');
+}
+
+function toggleTooltipExpand(tooltipId) {
+  const tooltip = document.getElementById(tooltipId);
+  if (!tooltip) return;
+  const expanded = tooltip.querySelector('.tooltip-expanded');
+  const btn = tooltip.querySelector('.tooltip-expand-btn');
+  if (!expanded) return;
+  expanded.classList.toggle('hidden');
+  if (btn) btn.textContent = expanded.classList.contains('hidden') ? 'Read more \u25BC' : 'Show less \u25B2';
+}
+
+// Close tooltips when clicking outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.info-btn') && !e.target.closest('.info-tooltip')) {
+    document.querySelectorAll('.info-tooltip').forEach(t => t.classList.remove('visible'));
+  }
+});
+
+function getPctClass(pct) {
+  if (pct === null || pct === undefined) return '';
+  if (pct >= 90) return 'high';
+  if (pct >= 60) return 'medium';
+  return 'low';
+}
+
+// ─── Build per-region HTML panels ────────────────────────────────────────────
+
+function buildRegionPanels(regions) {
+  const container = document.getElementById('flaring-regions-container');
+  if (!container) return;
+  container.innerHTML = '';
+  regions.forEach(region => {
+    const panel = document.createElement('div');
+    panel.className = 'flaring-region-section';
+    panel.id = `flaring-panel-${region.key}`;
+    panel.innerHTML = `
+      <div class="flaring-region-header" onclick="toggleRegionPanel('${region.key}')">
+        <div>
+          <div class="flaring-region-title">${region.label}</div>
+          <div class="flaring-region-sublabel">${region.sublabel || ''}</div>
+        </div>
+        <div class="flaring-region-right">
+          <div class="frp-stat">
+            <div class="frp-stat-value" id="frp-val-${region.key}">&mdash;</div>
+            <div class="frp-stat-label">7-day avg FRP (MW)</div>
+          </div>
+          <div class="pct-badge" id="pct-badge-${region.key}">&mdash;%</div>
+          <button class="info-btn" onclick="event.stopPropagation(); toggleTooltip('tooltip-${region.key}')" aria-label="What is this?">&#9432;</button>
+        </div>
+      </div>
+      <div class="info-tooltip" id="tooltip-${region.key}">
+        <p>This chart tracks gas flaring intensity in the ${region.label} oil fields using NASA VIIRS satellite data. Flaring is a direct byproduct of crude production &mdash; when output is curtailed, flaring drops. The line shows Fire Radiative Power (MW) vs. the pre-crisis baseline.</p>
+        <button class="tooltip-expand-btn" onclick="toggleTooltipExpand('tooltip-${region.key}')">Read more &#9660;</button>
+        <div class="tooltip-expanded hidden">
+          <p>Pre-crisis baseline FRP: <strong>${region.baseline_frp ? parseFloat(region.baseline_frp).toFixed(1) + ' MW' : 'Calculating...'}</strong> (mean daily average, Feb 1&ndash;27, 2026). The 7-day rolling average smooths day-to-day variability from cloud cover and satellite pass timing. The thin line shows raw daily detections.</p>
+          ${region.contextNote ? `<p>${region.contextNote}</p>` : ''}
+          <button class="tooltip-expand-btn" onclick="toggleTooltipExpand('tooltip-${region.key}')">Show less &#9650;</button>
+        </div>
+      </div>
+      <div class="flaring-region-body" id="flaring-body-${region.key}">
+        <div class="flaring-chart-controls">
+          <span style="font-size:0.8rem; color:var(--muted)">Date range:</span>
+          <select class="date-range-select" id="daterange-${region.key}"
+                  onchange="onDateRangeChange('${region.key}', this.value)">
+            <option value="2026-02-28" selected>Since Crisis Start</option>
+            <option value="last7">Last 7 days</option>
+            <option value="last14">Last 14 days</option>
+            <option value="last30">Last 30 days</option>
+            <option value="last60">Last 60 days</option>
+          </select>
+        </div>
+        <div class="chart-container">
+          <canvas id="chart-flaring-${region.key}"></canvas>
+        </div>
+        <div class="flaring-chart-stats">
+          <span>Latest 7-day avg: <strong id="stat-avg-${region.key}">&mdash;</strong> MW</span>
+          <span>Pre-crisis baseline: <strong>${region.baseline_frp ? parseFloat(region.baseline_frp).toFixed(1) : '&mdash;'}</strong> MW</span>
+          <span>Change from baseline: <strong id="stat-chg-${region.key}">&mdash;</strong></span>
+        </div>
+        ${region.contextNote ? `<div class="region-context-note">${region.contextNote}</div>` : ''}
+      </div>
+    `;
+    container.appendChild(panel);
+  });
+}
+
+function toggleRegionPanel(regionKey) {
+  const panel = document.getElementById(`flaring-panel-${regionKey}`);
+  if (!panel) return;
+  panel.classList.toggle('expanded');
+  // Lazy-load chart when first expanded
+  if (panel.classList.contains('expanded') && flaringData[regionKey]) {
+    renderRegionChart(regionKey, flaringData[regionKey]);
+  }
+}
+
+// ─── Chart rendering ──────────────────────────────────────────────────────────
+
+function computeDateFrom(value) {
+  if (value.startsWith('last')) {
+    const days = parseInt(value.replace('last', ''));
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return d.toISOString().split('T')[0];
+  }
+  return value; // already a YYYY-MM-DD string
+}
+
+function renderRegionChart(regionKey, data, fromDate) {
+  const from = fromDate || computeDateFrom(
+    document.getElementById(`daterange-${regionKey}`)?.value || '2026-02-28'
+  );
+  const filtered = data.filter(d => {
+    const dateStr = d.date instanceof Date ? d.date.toISOString().split('T')[0] : (d.date || '').split('T')[0];
+    return dateStr >= from;
+  });
+  const labels   = filtered.map(d => {
+    const dateStr = d.date instanceof Date ? d.date.toISOString().split('T')[0] : (d.date || '').split('T')[0];
+    return dateStr;
+  });
+  const rawFRP   = filtered.map(d => d.frp_sum !== null ? parseFloat(d.frp_sum) : null);
+  const avgFRP   = filtered.map(d => d.rolling_avg_7d !== null ? parseFloat(d.rolling_avg_7d) : null);
+  const baseline = filtered[0]?.baseline_frp ? parseFloat(filtered[0].baseline_frp) : null;
+
+  const canvasId = `chart-flaring-${regionKey}`;
+  const existing = Chart.getChart(canvasId);
+  if (existing) existing.destroy();
+
+  const ctx = document.getElementById(canvasId)?.getContext('2d');
+  if (!ctx) return;
+
+  const baselineDataset = baseline ? {
+    label: 'Pre-crisis baseline',
+    data: labels.map(() => baseline),
+    borderColor: 'rgba(107,114,128,0.6)',
+    borderDash: [5, 5],
+    borderWidth: 1,
+    pointRadius: 0,
+    fill: false,
+  } : null;
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Raw daily FRP (MW)',
+          data: rawFRP,
+          borderColor: 'rgba(245,158,11,0.35)',
+          borderWidth: 1,
+          pointRadius: 1.5,
+          fill: false,
+          spanGaps: false,
+        },
+        {
+          label: '7-day rolling avg (MW)',
+          data: avgFRP,
+          borderColor: 'rgba(245,158,11,1)',
+          borderWidth: 2,
+          pointRadius: 0,
+          fill: { target: 'origin', above: 'rgba(245,158,11,0.06)' },
+          spanGaps: true,
+        },
+        ...(baselineDataset ? [baselineDataset] : []),
+      ],
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#6b7280', font: { family: 'JetBrains Mono, monospace', size: 10 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) + ' MW' : 'N/A'}`,
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#6b7280', font: { size: 10 }, maxRotation: 45 }, grid: { color: '#1f2937' } },
+        y: {
+          ticks: { color: '#6b7280', font: { family: 'JetBrains Mono, monospace', size: 10 } },
+          grid: { color: '#1f2937' },
+          title: { display: true, text: 'FRP (MW)', color: '#6b7280', font: { size: 10 } },
+        }
+      }
+    }
+  });
+
+  // Update stats footer
+  const latest = avgFRP.filter(v => v !== null).slice(-1)[0];
+  if (latest !== undefined) {
+    document.getElementById(`stat-avg-${regionKey}`).textContent = latest.toFixed(1);
+    if (baseline) {
+      const chg = ((latest - baseline) / baseline * 100).toFixed(1);
+      const el = document.getElementById(`stat-chg-${regionKey}`);
+      el.textContent = `${chg > 0 ? '+' : ''}${chg}%`;
+      el.style.color = chg < -10 ? 'var(--red)' : chg > 5 ? 'var(--green)' : 'var(--amber)';
+    }
+  }
+}
+
+function onDateRangeChange(regionKey, value) {
+  if (flaringData[regionKey]) {
+    const from = computeDateFrom(value);
+    renderRegionChart(regionKey, flaringData[regionKey], from);
+  }
+  // Persist preference in localStorage
+  try { localStorage.setItem(`flaring-daterange-${regionKey}`, value); } catch(e) {}
+}
+
+// Restore saved date range preferences on load
+function restoreDateRangePreferences() {
+  document.querySelectorAll('.date-range-select').forEach(sel => {
+    const regionKey = sel.id.replace('daterange-', '');
+    try {
+      const saved = localStorage.getItem(`flaring-daterange-${regionKey}`);
+      if (saved) sel.value = saved;
+    } catch(e) {}
+  });
+}
+
+// ─── Gulf Index chart ─────────────────────────────────────────────────────────
+
+function renderGulfIndexChart(indexSeries) {
+  const labels = indexSeries.map(d => d.date);
+  const values = indexSeries.map(d => d.index_value !== null ? parseFloat(d.index_value) : null);
+
+  const latest = values.filter(v => v !== null).slice(-1)[0];
+  if (latest !== undefined) {
+    const color = latest >= 90 ? 'var(--green)' : latest >= 60 ? 'var(--amber)' : 'var(--red)';
+    document.getElementById('gulf-index-big-value').textContent = latest.toFixed(1);
+    document.getElementById('gulf-index-big-value').style.color = color;
+    document.getElementById('gulf-index-headline').textContent = latest.toFixed(1);
+    document.getElementById('gulf-index-headline').style.color = color;
+  }
+
+  const existing = Chart.getChart('chart-gulf-index');
+  if (existing) existing.destroy();
+
+  const ctx = document.getElementById('chart-gulf-index')?.getContext('2d');
+  if (!ctx) return;
+
+  gulfIndexChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Gulf Production Activity Index',
+          data: values,
+          borderColor: 'rgba(245,158,11,1)',
+          borderWidth: 2,
+          pointRadius: 0,
+          fill: { target: 'origin', above: 'rgba(245,158,11,0.08)' },
+          spanGaps: true,
+        },
+        {
+          label: 'Pre-crisis baseline (100)',
+          data: labels.map(() => 100),
+          borderColor: 'rgba(107,114,128,0.5)',
+          borderDash: [5,5],
+          borderWidth: 1,
+          pointRadius: 0,
+          fill: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#6b7280', font: { size: 10 } } },
+        tooltip: { callbacks: { label: ctx => `Index: ${ctx.parsed.y?.toFixed(1)}` } }
+      },
+      scales: {
+        x: { ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: '#1f2937' } },
+        y: {
+          ticks: { color: '#6b7280', font: { family: 'JetBrains Mono, monospace', size: 10 } },
+          grid: { color: '#1f2937' },
+          suggestedMin: 0, suggestedMax: 110,
+        }
+      }
+    }
+  });
+}
+
+// ─── Main flaring loader ──────────────────────────────────────────────────────
+
+async function loadFlaring() {
+  try {
+    // 1. Load region metadata
+    const regionsRes = await fetch('/api/flaring/regions');
+    const regions = await regionsRes.json();
+    buildRegionPanels(regions);
+    restoreDateRangePreferences();
+
+    // 2. Load per-region time series
+    for (const region of regions) {
+      try {
+        const res = await fetch(`/api/flaring/${region.key}?from=2026-02-28`);
+        const json = await res.json();
+        flaringData[region.key] = json.data;
+
+        // Update summary stats in collapsed header
+        const latest = json.data.filter(d => d.rolling_avg_7d !== null).slice(-1)[0];
+        if (latest) {
+          document.getElementById(`frp-val-${region.key}`).textContent =
+            parseFloat(latest.rolling_avg_7d).toFixed(1);
+          const pct = latest.pct_of_baseline !== null ? parseFloat(latest.pct_of_baseline) : null;
+          const badge = document.getElementById(`pct-badge-${region.key}`);
+          if (pct !== null) {
+            badge.textContent = `${pct.toFixed(0)}%`;
+            badge.className = `pct-badge ${getPctClass(pct)}`;
+          }
+        }
+      } catch(e) {
+        console.warn(`[flaring] Failed to load ${region.key}:`, e.message);
+      }
+    }
+
+    // 3. Load Gulf Index
+    const indexRes = await fetch('/api/flaring/index/daily?from=2026-02-28');
+    const indexData = await indexRes.json();
+    renderGulfIndexChart(indexData);
+
+  } catch(err) {
+    console.error('[flaring] Load failed:', err.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SECTION: CRISIS INTELLIGENCE FEED
+// ═══════════════════════════════════════════════════════════════
+
+let intelItems = [];
+let intelOffset = 0;
+const INTEL_PAGE_SIZE = 20;
+let currentIntelCategory = 'ALL';
+let lastIntelCheckCount = 0;
+
+function timeAgo(dateStr) {
+  if (!dateStr) return 'recently';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60)  return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)   return `${hrs} hour${hrs !== 1 ? 's' : ''} ago`;
+  return `${Math.floor(hrs / 24)} day${Math.floor(hrs/24) !== 1 ? 's' : ''} ago`;
+}
+
+function renderIntelCards(items, append) {
+  const container = document.getElementById('intel-feed-container');
+  if (!container) return;
+  if (!append) container.innerHTML = '';
+  if (items.length === 0 && !append) {
+    container.innerHTML = '<p class="data-placeholder">Intelligence feed populating &mdash; check back in a few hours.</p>';
+    return;
+  }
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'intel-card';
+    card.dataset.category = item.category || 'MARKETS';
+    card.innerHTML = `
+      <div class="intel-card-meta">
+        <span class="intel-source">${item.source}</span>
+        <span class="intel-time">${timeAgo(item.published_at || item.fetched_at)}</span>
+        <span class="intel-cat-badge intel-cat-${item.category || 'MARKETS'}">${item.category || 'MARKETS'}</span>
+      </div>
+      <div class="intel-headline">${item.headline}</div>
+      ${item.summary ? `<div class="intel-summary">${item.summary.substring(0, 200)}${item.summary.length > 200 ? '\u2026' : ''}</div>` : ''}
+      ${item.metric_extracted ? `<div class="intel-metric">\u21B3 ${item.metric_extracted}</div>` : ''}
+      ${item.source_url ? `<a class="intel-link" href="${item.source_url}" target="_blank" rel="noopener">Read more \u2192</a>` : ''}
+    `;
+    container.appendChild(card);
+  });
+}
+
+function filterIntel(category, btn) {
+  currentIntelCategory = category;
+  document.querySelectorAll('.intel-tab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  const cards = document.querySelectorAll('#intel-feed-container .intel-card');
+  let visible = 0;
+  cards.forEach(card => {
+    const show = category === 'ALL' || card.dataset.category === category;
+    card.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+
+  // Show empty state if needed
+  const container = document.getElementById('intel-feed-container');
+  const placeholder = container.querySelector('.data-placeholder');
+  if (visible === 0 && !placeholder) {
+    const p = document.createElement('p');
+    p.className = 'data-placeholder category-empty';
+    p.textContent = `No ${category} items yet.`;
+    container.appendChild(p);
+  } else if (visible > 0) {
+    container.querySelector('.category-empty')?.remove();
+  }
+}
+
+async function loadMoreIntel() {
+  intelOffset += INTEL_PAGE_SIZE;
+  try {
+    const res = await fetch(`/api/intelligence?limit=${INTEL_PAGE_SIZE}&offset=${intelOffset}`);
+    const items = await res.json();
+    renderIntelCards(items, true);
+    if (items.length < INTEL_PAGE_SIZE) {
+      document.getElementById('intel-load-more').classList.add('hidden');
+    }
+  } catch(e) {
+    console.warn('[intelligence] Load more failed:', e.message);
+  }
+}
+
+async function loadIntelligence() {
+  try {
+    const res = await fetch('/api/intelligence?limit=40');
+    intelItems = await res.json();
+    renderIntelCards(intelItems);
+    document.getElementById('intel-last-updated').textContent =
+      `Updated ${timeAgo(new Date().toISOString())}`;
+    lastIntelCheckCount = intelItems.length;
+
+    const loadMoreBtn = document.getElementById('intel-load-more');
+    if (intelItems.length >= 40) loadMoreBtn.classList.remove('hidden');
+
+  } catch(err) {
+    console.error('[intelligence] Load failed:', err.message);
+  }
+}
+
+// Poll for new items every 10 minutes
+async function checkIntelUpdate() {
+  try {
+    const res = await fetch('/api/intelligence/latest');
+    const { count } = await res.json();
+    if (count > lastIntelCheckCount) {
+      const badge = document.getElementById('intel-new-badge');
+      const diff = count - lastIntelCheckCount;
+      badge.textContent = `${diff} new item${diff !== 1 ? 's' : ''} \u2014 click to refresh`;
+      badge.classList.remove('hidden');
+      badge.onclick = () => { loadIntelligence(); badge.classList.add('hidden'); };
+    }
+  } catch(e) { /* silent */ }
+}
+
 // === INIT ===
 
 async function init() {
@@ -416,12 +906,21 @@ async function init() {
   // Check configuration status
   checkConfigStatus();
 
+  // Load flaring data
+  await loadFlaring();
+
+  // Load intelligence feed
+  await loadIntelligence();
+
   // Update timestamp
   document.getElementById('last-updated').textContent =
     `Updated: ${new Date().toLocaleTimeString()}`;
 
   // Refresh dollar value every 5 minutes (saves API credits)
   setInterval(updateDollarValue, 5 * 60_000);
+
+  // Check for new intelligence items every 10 minutes
+  setInterval(checkIntelUpdate, 10 * 60_000);
 }
 
 init();

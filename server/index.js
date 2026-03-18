@@ -11,12 +11,19 @@ const PORT = process.env.PORT || 3000;
 // Run migrations on startup
 async function runMigrations() {
   try {
-    const sql = fs.readFileSync(
+    const sql001 = fs.readFileSync(
       path.join(__dirname, 'migrations', '001_create_tables.sql'),
       'utf8'
     );
-    await db.query(sql);
-    console.log('[server] Migrations applied');
+    await db.query(sql001);
+    console.log('[server] Migration 001 applied');
+
+    const sql002 = fs.readFileSync(
+      path.join(__dirname, 'migrations', '002_flaring_intel_tables.sql'),
+      'utf8'
+    );
+    await db.query(sql002);
+    console.log('[server] Migration 002 applied');
   } catch (err) {
     console.error('[server] Migration error:', err.message);
   }
@@ -43,11 +50,15 @@ const { runEIA } = require('./cron/eia');
 const { runAIS } = require('./cron/ais');
 const { runLogistics } = require('./cron/logistics');
 const { calculateDeficit } = require('./cron/deficit');
+const { runFlaring } = require('./cron/flaring');
+const { runIntelligence } = require('./cron/intelligence');
 
 cron.schedule('5 0 * * *',   () => calculateDeficit(), { timezone: 'UTC' });
 cron.schedule('0 6 * * *',   () => runAIS(),           { timezone: 'UTC' });
 cron.schedule('0 14 * * 3',  () => runEIA(),           { timezone: 'America/New_York' });
 cron.schedule('0 12 * * 4',  () => runLogistics(),     { timezone: 'UTC' });
+cron.schedule('0 10 * * *',  () => runFlaring(),       { timezone: 'UTC' });  // daily at 10:00 UTC
+cron.schedule('0 */3 * * *', () => runIntelligence(),  { timezone: 'UTC' });  // every 3 hours
 
 console.log('[server] Cron jobs registered');
 

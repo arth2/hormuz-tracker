@@ -57,6 +57,84 @@
   </div>
 </section>
 
+<!-- WELLHEAD PRODUCTION ACTIVITY — VIIRS Gas Flaring -->
+<section id="section-flaring" class="panel-full collapsible-section">
+  <div class="collapsible-header" onclick="toggleSection('section-flaring')">
+    <div class="section-header-left">
+      <span class="collapse-toggle" id="toggle-section-flaring">&#9654;</span>
+      <h2>WELLHEAD PRODUCTION ACTIVITY</h2>
+      <span class="freshness-badge">Daily &middot; NASA VIIRS satellite</span>
+    </div>
+    <div class="section-header-right">
+      <div class="gulf-index-summary">
+        <span class="gulf-index-label">GULF PRODUCTION INDEX</span>
+        <span class="gulf-index-value" id="gulf-index-headline">&mdash;</span>
+        <span class="gulf-index-sub">% of pre-crisis baseline</span>
+      </div>
+      <button class="info-btn" onclick="event.stopPropagation(); toggleTooltip('tooltip-flaring-main')" aria-label="What is this?">&#9432;</button>
+    </div>
+  </div>
+  <!-- Tooltip: main section -->
+  <div class="info-tooltip" id="tooltip-flaring-main">
+    <p>Gas flaring at oil wellheads is a direct byproduct of crude production. When output is curtailed, flaring drops. This section tracks daily thermal satellite detections (NASA VIIRS) as a proxy for production activity &mdash; comparing today's level to the pre-crisis baseline.</p>
+    <button class="tooltip-expand-btn" onclick="toggleTooltipExpand('tooltip-flaring-main')">Read more &#9660;</button>
+    <div class="tooltip-expanded hidden">
+      <p>The VIIRS sensor aboard NOAA-20 and Suomi-NPP satellites detects thermal anomalies globally on every orbit, publishing data daily through NASA FIRMS with 3&ndash;12 hour latency. Fire Radiative Power (FRP) measures flare intensity in megawatts &mdash; not just a binary detection, but a quantitative signal. Summing FRP across oil field bounding boxes gives a production activity index used by energy research firms as a leading indicator of upstream supply.</p>
+      <p>Caveats: cloud cover can suppress detections; flaring may vary due to maintenance or gas capture policy changes independent of production levels. The 7-day rolling average smooths satellite pass variability. This is a directional proxy, not a precise barrel count.</p>
+      <button class="tooltip-expand-btn" onclick="toggleTooltipExpand('tooltip-flaring-main')">Show less &#9650;</button>
+    </div>
+  </div>
+
+  <!-- Collapsed body -->
+  <div class="collapsible-body" id="body-section-flaring">
+
+    <!-- Gulf Production Activity Index panel -->
+    <div class="gulf-index-panel">
+      <div class="gulf-index-header">
+        <span class="chart-title">GULF PRODUCTION ACTIVITY INDEX</span>
+        <span class="gulf-index-subtitle">Weighted composite &middot; 6 regions &middot; 100 = pre-crisis baseline</span>
+      </div>
+      <div class="gulf-index-big">
+        <span id="gulf-index-big-value">&mdash;</span>
+        <span class="gulf-index-big-label">% of pre-crisis</span>
+      </div>
+      <div class="chart-container">
+        <canvas id="chart-gulf-index"></canvas>
+      </div>
+    </div>
+
+    <!-- Per-region collapsible panels -->
+    <div id="flaring-regions-container">
+      <!-- Populated dynamically by app.js using region metadata from /api/flaring/regions -->
+    </div>
+
+  </div>
+</section>
+
+<!-- CRISIS INTELLIGENCE FEED -->
+<section id="section-intelligence" class="panel-full">
+  <div class="section-header-row">
+    <h2>CRISIS INTELLIGENCE FEED</h2>
+    <span class="freshness-badge" id="intel-last-updated">Updating...</span>
+    <span id="intel-new-badge" class="new-badge hidden"></span>
+  </div>
+
+  <!-- Category filter tabs -->
+  <div class="intel-tabs">
+    <button class="intel-tab active" data-category="ALL" onclick="filterIntel('ALL', this)">All</button>
+    <button class="intel-tab" data-category="PRODUCTION" onclick="filterIntel('PRODUCTION', this)">Production</button>
+    <button class="intel-tab" data-category="SHIPPING"   onclick="filterIntel('SHIPPING', this)">Shipping</button>
+    <button class="intel-tab" data-category="STORAGE"    onclick="filterIntel('STORAGE', this)">Storage</button>
+    <button class="intel-tab" data-category="POLICY"     onclick="filterIntel('POLICY', this)">Policy</button>
+    <button class="intel-tab" data-category="MARKETS"    onclick="filterIntel('MARKETS', this)">Markets</button>
+  </div>
+
+  <div id="intel-feed-container">
+    <p class="data-placeholder">Intelligence feed populating &mdash; check back in a few hours.</p>
+  </div>
+  <button id="intel-load-more" class="load-more-btn hidden" onclick="loadMoreIntel()">Load more</button>
+</section>
+
 <!-- MARKET GRID: 2x2 -->
 <div class="market-grid">
   <section class="panel" id="panel-oil">
@@ -68,7 +146,7 @@
     <div id="table-markets" class="data-table"></div>
   </section>
   <section class="panel" id="panel-commodities">
-    <h3>COMMODITIES & CRYPTO <span class="freshness-badge">Live &middot; 15-min delay</span></h3>
+    <h3>COMMODITIES (FUTURES) & CRYPTO <span class="freshness-badge">Live &middot; 15-min delay</span></h3>
     <div id="table-commodities" class="data-table"></div>
   </section>
   <section class="panel" id="panel-logistics">
@@ -85,7 +163,7 @@
 
 <!-- FOOTER -->
 <footer>
-  Data sources: EIA &middot; Twelve Data &middot; FRED &middot; Drewry &middot; VesselFinder (AIS proxy) &middot;
+  Data sources: EIA &middot; Twelve Data &middot; FRED &middot; Drewry &middot; VesselFinder (AIS proxy) &middot; NASA FIRMS (VIIRS) &middot;
   All deltas vs. Feb 27, 2026 baseline &middot; AIS tanker count is a directional proxy, not official data
 </footer>
 
