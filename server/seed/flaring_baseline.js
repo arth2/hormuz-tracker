@@ -15,20 +15,30 @@ function parseVIIRSCsv(text) {
 }
 
 async function fetchArchive(bbox) {
-  // Archive URL pattern (FIRMS standard product — up to 1 year back):
-  // Format: .../PRODUCT/BBOX/START_DATE/DAYS_COUNT
-  const archiveUrl = `https://firms.modaps.eosdis.nasa.gov/usfs/api/area/csv/${process.env.FIRMS_MAP_KEY}/VIIRS_SNPP_SP/${bbox}/2026-02-01/27`;
-  const response = await axios.get(archiveUrl, {
-    timeout: 30000,
-    headers: { 'User-Agent': 'HormuzTracker/1.0' }
-  });
-  return parseVIIRSCsv(response.data);
+  // FIRMS API area query with date range
+  // Format: /api/area/csv/{MAP_KEY}/{source}/{area}/{day_range}/{date}
+  // date = YYYY-MM-DD of the start date; day_range = number of days
+  const archiveUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${process.env.FIRMS_MAP_KEY}/VIIRS_SNPP_SP/${bbox}/27/2026-02-01`;
+  console.log(`[seed/flaring] Fetching: ${archiveUrl.replace(process.env.FIRMS_MAP_KEY, '***')}`);
+  try {
+    const response = await axios.get(archiveUrl, {
+      timeout: 60000,
+      headers: { 'User-Agent': 'HormuzTracker/1.0' }
+    });
+    return parseVIIRSCsv(response.data);
+  } catch (err) {
+    // Log response body for debugging 400/403 errors
+    if (err.response) {
+      console.error(`[seed/flaring] FIRMS API error ${err.response.status}: ${JSON.stringify(err.response.data).substring(0, 500)}`);
+    }
+    throw err;
+  }
 }
 
 async function seedBaseline() {
   if (!process.env.FIRMS_MAP_KEY || process.env.FIRMS_MAP_KEY === 'your_key_here') {
     console.error('[seed/flaring] FIRMS_MAP_KEY not configured. Exiting.');
-    process.exit(1);
+    return;
   }
 
   for (const region of FLARING_REGIONS) {
@@ -86,9 +96,8 @@ async function seedBaseline() {
   }
 
   console.log('[seed/flaring] Done. Run "node server/seed/flaring_baseline.js" again if any regions failed.');
-  process.exit(0);
 }
 
 module.exports.seedBaseline = seedBaseline;
 
-if (require.main === module) seedBaseline();
+if (require.main === module) seedBaseline().then(() => process.exit(0));

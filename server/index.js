@@ -8,6 +8,9 @@ const apiRoutes = require('./routes/api');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy — Railway runs behind a reverse proxy
+app.set('trust proxy', 1);
+
 // Run migrations on startup
 async function runMigrations() {
   try {
