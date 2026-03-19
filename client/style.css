@@ -472,6 +472,10 @@ footer {
   border-radius: 10px; cursor: pointer;
 }
 .new-badge.hidden { display: none; }
+#intel-feed-container {
+  max-height: 380px;
+  overflow-y: auto;
+}
 .load-more-btn {
   background: var(--surface); border: 1px solid var(--border);
   color: var(--muted); padding: 0.5rem 1.5rem; border-radius: 4px;

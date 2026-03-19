@@ -416,6 +416,7 @@ async function checkConfigStatus() {
 // Stores fetched data keyed by region for re-rendering on date change
 const flaringData = {};
 let gulfIndexChart = null;
+let pendingGulfIndexData = null;
 
 // ─── UI helpers ──────────────────────────────────────────────────────────────
 
@@ -425,6 +426,11 @@ function toggleSection(sectionId) {
   section.classList.toggle('expanded');
   const toggle = document.getElementById(`toggle-${sectionId}`);
   if (toggle) toggle.textContent = section.classList.contains('expanded') ? '\u25BC' : '\u25B6';
+  // Lazy-render Gulf Index chart on first expand (Chart.js needs visible container)
+  if (sectionId === 'section-flaring' && section.classList.contains('expanded') && pendingGulfIndexData) {
+    renderGulfIndexChart(pendingGulfIndexData);
+    pendingGulfIndexData = null;
+  }
 }
 
 function toggleTooltip(tooltipId) {
@@ -753,10 +759,10 @@ async function loadFlaring() {
       }
     }
 
-    // 3. Load Gulf Index
+    // 3. Load Gulf Index (defer chart render until section is expanded)
     const indexRes = await fetch('/api/flaring/index/daily?from=2026-02-28');
     const indexData = await indexRes.json();
-    renderGulfIndexChart(indexData);
+    pendingGulfIndexData = indexData;
 
     // 4. Compute trend arrow for collapsed header
     if (indexData.length >= 2) {

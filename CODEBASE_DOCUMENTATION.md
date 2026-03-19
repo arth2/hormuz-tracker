@@ -2,7 +2,7 @@
 
 ## 1. Project Overview
 
-The Hormuz Crisis Tracker is a real-time dashboard monitoring a fictional geopolitical scenario: the closure of the Strait of Hormuz (beginning Feb 28, 2026). It tracks the supply deficit created by the blockage, live commodity prices, satellite-derived production activity, and curated intelligence from energy news sources.
+The Hormuz Crisis Tracker is a real-time dashboard monitoring the closure of the Strait of Hormuz (beginning Feb 28, 2026). It tracks the supply deficit created by the blockage, live commodity prices, satellite-derived production activity, and curated intelligence from energy news sources.
 
 The dashboard displays:
 - **The Deficit** — daily and cumulative oil supply shortfall (mb/d), dollar value at current Brent
@@ -190,6 +190,7 @@ All cron jobs are registered in `server/index.js` and use UTC timezone.
 | `runEIA` | `0 14 * * 3` (14:00 ET Wednesdays) | `cron/eia.js` | EIA API | Fetches 6 petroleum data series (gasoline, diesel, jet fuel, heating oil, production, refinery inputs) |
 | `runLogistics` | `0 12 * * 4` (12:00 UTC Thursdays) | `cron/logistics.js` | FRED CSV, Drewry (scrape) | Fetches Brent from FRED, World Container Index from Drewry |
 | `runFlaring` | `0 10 * * *` (10:00 UTC daily) | `cron/flaring.js` | NASA FIRMS | Fetches VIIRS NRT data for 6 Gulf oil regions, computes daily FRP + rolling avg |
+| `backfillFlaring` | On startup (once) | `cron/flaring.js` | NASA FIRMS | Fills missing flaring data from crisis start (Feb 28) to yesterday in 5-day chunks |
 | `runIntelligence` | `0 */3 * * *` (every 3 hours) | `cron/intelligence.js` | RSS feeds, HTML scrapes | Fetches news from 10 sources, filters by keyword relevance, scores, deduplicates, stores |
 
 All cron jobs catch errors per-item and continue — no single failure crashes the process.
@@ -287,7 +288,13 @@ All cron jobs catch errors per-item and continue — no single failure crashes t
 ### Collapsible Sections
 - Flaring section starts collapsed; toggled via `toggleSection('section-flaring')`
 - Per-region panels are also collapsible; charts lazy-load on first expand
+- Gulf Index chart is deferred until section is first expanded (Chart.js requires visible container)
 - CSS class `.expanded` controls visibility of `.collapsible-body`
+
+### Intelligence Feed Scrolling
+- `#intel-feed-container` has `max-height: 380px` with `overflow-y: auto`
+- Shows ~3-4 stories visible; rest accessible via scroll
+- Filter tabs and "Load more" button remain outside the scroll area
 
 ---
 
@@ -401,4 +408,6 @@ Migrations run automatically on every server startup. Both are idempotent (`CREA
 
 7. **Intelligence deduplication** — Uses URL-based exact match, falling back to headline prefix (first 80 chars) fuzzy match within 24 hours. Slightly different headlines from different sources about the same event will both be stored.
 
-8. **Gulf Production Index** — Requires `pct_of_baseline` values from daily flaring cron runs. Will show "—" until at least 1-2 days of successful flaring data accumulates.
+8. **Gulf Production Index** — Requires `pct_of_baseline` values from daily flaring cron runs. The startup backfill (`backfillFlaring`) automatically fills gaps, so this should populate on first deploy if `FIRMS_MAP_KEY` is configured.
+
+9. **Flaring backfill on startup** — `backfillFlaring()` runs non-blocking on every server start. It fetches FIRMS NRT data in 5-day chunks for all missing dates from Feb 28 to yesterday. NRT data is available for ~60 days; older data requires SP (2-3 month lag). The backfill skips dates that already have non-null `frp_sum` values.

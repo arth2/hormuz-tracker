@@ -131,17 +131,136 @@ async function runFlaring() {
 
     } catch (err) {
       console.error(`[flaring] ${region.key} failed: ${err.message}`);
-      // Store NULL row so we know this date was attempted
-      await db.query(`
-        INSERT INTO flaring_data (region_key, date, data_source)
-        VALUES ($1, $2, 'NRT')
-        ON CONFLICT (region_key, date) DO NOTHING
-      `, [region.key, today]);
     }
   }
 }
 
+// ─── Backfill missing dates from crisis start to yesterday ────────────────
+async function backfillFlaring() {
+  if (!process.env.FIRMS_MAP_KEY || process.env.FIRMS_MAP_KEY === 'your_key_here') {
+    console.log('[backfill] No FIRMS_MAP_KEY configured, skipping');
+    return;
+  }
+
+  const crisisStart = '2026-02-28';
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+  console.log(`[backfill] Checking for missing flaring data ${crisisStart} → ${yesterdayStr}`);
+
+  // Build set of all expected dates
+  const allDates = [];
+  for (let d = new Date(crisisStart); d <= yesterday; d.setDate(d.getDate() + 1)) {
+    allDates.push(d.toISOString().split('T')[0]);
+  }
+
+  let totalBackfilled = 0;
+
+  for (const region of FLARING_REGIONS) {
+    // Find dates that already have real data
+    const existing = await db.query(
+      `SELECT TO_CHAR(date, 'YYYY-MM-DD') AS date FROM flaring_data
+       WHERE region_key = $1 AND frp_sum IS NOT NULL AND date >= $2`,
+      [region.key, crisisStart]
+    );
+    const existingSet = new Set(existing.rows.map(r => r.date));
+    const missingDates = allDates.filter(d => !existingSet.has(d));
+
+    if (missingDates.length === 0) {
+      console.log(`[backfill] ${region.key}: complete, no gaps`);
+      continue;
+    }
+
+    console.log(`[backfill] ${region.key}: ${missingDates.length} missing dates, fetching...`);
+
+    // Fetch baseline
+    const blRow = await db.query(
+      'SELECT baseline_frp FROM flaring_baselines WHERE region_key = $1',
+      [region.key]
+    );
+    const baseline_frp = blRow.rows[0]?.baseline_frp ? parseFloat(blRow.rows[0].baseline_frp) : null;
+
+    // Fetch in ≤10-day chunks covering the full range
+    const startDate = new Date(missingDates[0]);
+    const endDate = new Date(missingDates[missingDates.length - 1]);
+    const missingSet = new Set(missingDates);
+    let allDetections = [];
+
+    for (let chunkStart = new Date(startDate); chunkStart <= endDate;) {
+      const daysRemaining = Math.ceil((endDate - chunkStart) / (1000 * 60 * 60 * 24)) + 1;
+      const chunkDays = Math.min(5, daysRemaining);
+      const dateStr = chunkStart.toISOString().split('T')[0];
+
+      const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${process.env.FIRMS_MAP_KEY}/VIIRS_SNPP_NRT/${region.bbox}/${chunkDays}/${dateStr}`;
+
+      try {
+        const response = await axios.get(url, {
+          timeout: 30000,
+          headers: { 'User-Agent': 'HormuzTracker/1.0' }
+        });
+        const rows = parseVIIRSCsv(response.data);
+        allDetections = allDetections.concat(rows);
+      } catch (err) {
+        console.error(`[backfill] ${region.key} chunk ${dateStr}+${chunkDays}d failed: ${err.message}`);
+      }
+
+      chunkStart.setDate(chunkStart.getDate() + chunkDays);
+      // Small delay between requests
+      await new Promise(r => setTimeout(r, 1000));
+    }
+
+    // Aggregate detections by date
+    const byDate = {};
+    allDetections
+      .filter(r => r.confidence !== 'low' && parseFloat(r.frp) > 0)
+      .forEach(r => {
+        if (!missingSet.has(r.acq_date)) return;
+        if (!byDate[r.acq_date]) byDate[r.acq_date] = { frp: 0, count: 0 };
+        byDate[r.acq_date].frp += parseFloat(r.frp);
+        byDate[r.acq_date].count += 1;
+      });
+
+    // Upsert each date's data
+    const sortedDates = Object.keys(byDate).sort();
+    for (const date of sortedDates) {
+      const { frp, count } = byDate[date];
+      const pct = baseline_frp ? (frp / baseline_frp) * 100 : null;
+
+      // Compute rolling avg from DB + current backfill data
+      const recentRows = await db.query(`
+        SELECT frp_sum FROM flaring_data
+        WHERE region_key = $1 AND frp_sum IS NOT NULL
+          AND date >= ($2::date - INTERVAL '7 days') AND date < $2
+        ORDER BY date DESC LIMIT 6
+      `, [region.key, date]);
+      const pastFRPs = recentRows.rows.map(r => parseFloat(r.frp_sum));
+      const allFRPs = [frp, ...pastFRPs];
+      const rolling_avg = allFRPs.reduce((a, b) => a + b, 0) / allFRPs.length;
+
+      await db.query(`
+        INSERT INTO flaring_data
+          (region_key, date, frp_sum, hotspot_count, rolling_avg_7d, baseline_frp, pct_of_baseline, data_source)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'NRT')
+        ON CONFLICT (region_key, date) DO UPDATE SET
+          frp_sum = EXCLUDED.frp_sum,
+          hotspot_count = EXCLUDED.hotspot_count,
+          rolling_avg_7d = EXCLUDED.rolling_avg_7d,
+          baseline_frp = EXCLUDED.baseline_frp,
+          pct_of_baseline = EXCLUDED.pct_of_baseline
+      `, [region.key, date, frp, count, rolling_avg, baseline_frp, pct]);
+
+      totalBackfilled++;
+    }
+
+    console.log(`[backfill] ${region.key}: inserted ${sortedDates.length} dates`);
+  }
+
+  console.log(`[backfill] Done. Total rows backfilled: ${totalBackfilled}`);
+}
+
 module.exports.runFlaring = runFlaring;
+module.exports.backfillFlaring = backfillFlaring;
 
 // Allow direct execution for testing
 if (require.main === module) runFlaring().then(() => process.exit(0));

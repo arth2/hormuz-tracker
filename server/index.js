@@ -53,7 +53,7 @@ const { runEIA } = require('./cron/eia');
 const { runAIS } = require('./cron/ais');
 const { runLogistics } = require('./cron/logistics');
 const { calculateDeficit } = require('./cron/deficit');
-const { runFlaring } = require('./cron/flaring');
+const { runFlaring, backfillFlaring } = require('./cron/flaring');
 const { runIntelligence } = require('./cron/intelligence');
 
 cron.schedule('5 0 * * *',   () => calculateDeficit(), { timezone: 'UTC' });
@@ -64,6 +64,9 @@ cron.schedule('0 10 * * *',  () => runFlaring(),       { timezone: 'UTC' });  //
 cron.schedule('0 */3 * * *', () => runIntelligence(),  { timezone: 'UTC' });  // every 3 hours
 
 console.log('[server] Cron jobs registered');
+
+// Backfill missing flaring data on startup (non-blocking)
+backfillFlaring().catch(err => console.error('[server] Backfill error:', err.message));
 
 app.listen(PORT, () => {
   console.log(`[server] Hormuz Crisis Tracker running on port ${PORT}`);
