@@ -479,3 +479,8 @@ footer {
 }
 .load-more-btn:hover { color: var(--text); }
 .load-more-btn.hidden { display: none; }
+.intel-summary-toggle {
+  color: var(--accent); font-size: 0.75rem; cursor: pointer;
+  text-decoration: none; margin-left: 0.25rem;
+}
+.intel-summary-toggle:hover { text-decoration: underline; }

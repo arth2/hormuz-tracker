@@ -758,6 +758,23 @@ async function loadFlaring() {
     const indexData = await indexRes.json();
     renderGulfIndexChart(indexData);
 
+    // 4. Compute trend arrow for collapsed header
+    if (indexData.length >= 2) {
+      const latest = parseFloat(indexData[indexData.length - 1].index_value);
+      // Find value ~7 days ago
+      const weekAgoIdx = Math.max(0, indexData.length - 8);
+      const weekAgo = parseFloat(indexData[weekAgoIdx].index_value);
+      const delta = latest - weekAgo;
+      const headlineEl = document.getElementById('gulf-index-headline');
+      let arrow, color;
+      if (delta < -2) { arrow = ' \u25BC'; color = 'var(--red)'; }
+      else if (delta > 2) { arrow = ' \u25B2'; color = 'var(--green)'; }
+      else { arrow = ' \u2192'; color = 'var(--amber)'; }
+      if (headlineEl && !isNaN(latest)) {
+        headlineEl.innerHTML = `${latest.toFixed(1)}<span class="gulf-trend-arrow" style="color:${color};font-size:0.9em;margin-left:0.3rem">${arrow}</span>`;
+      }
+    }
+
   } catch(err) {
     console.error('[flaring] Load failed:', err.message);
   }
@@ -802,7 +819,9 @@ function renderIntelCards(items, append) {
         <span class="intel-cat-badge intel-cat-${item.category || 'MARKETS'}">${item.category || 'MARKETS'}</span>
       </div>
       <div class="intel-headline">${item.headline}</div>
-      ${item.summary ? `<div class="intel-summary">${item.summary.substring(0, 200)}${item.summary.length > 200 ? '\u2026' : ''}</div>` : ''}
+      ${item.summary ? (item.summary.length > 180
+        ? `<div class="intel-summary"><span class="intel-summary-short">${item.summary.substring(0, 180)}\u2026</span><span class="intel-summary-full" style="display:none">${item.summary}</span> <a class="intel-summary-toggle" onclick="this.previousElementSibling.style.display=this.previousElementSibling.style.display==='none'?'inline':'none';this.previousElementSibling.previousElementSibling.style.display=this.previousElementSibling.previousElementSibling.style.display==='none'?'inline':'none';this.textContent=this.textContent==='Show more'?'Show less':'Show more'">Show more</a></div>`
+        : `<div class="intel-summary">${item.summary}</div>`) : ''}
       ${item.metric_extracted ? `<div class="intel-metric">\u21B3 ${item.metric_extracted}</div>` : ''}
       ${item.source_url ? `<a class="intel-link" href="${item.source_url}" target="_blank" rel="noopener">Read more \u2192</a>` : ''}
     `;
@@ -857,7 +876,15 @@ async function loadIntelligence() {
     renderIntelCards(intelItems);
     document.getElementById('intel-last-updated').textContent =
       `Updated ${timeAgo(new Date().toISOString())}`;
-    lastIntelCheckCount = intelItems.length;
+
+    // Sync lastIntelCheckCount with the actual 6-hour count from the API
+    try {
+      const latestRes = await fetch('/api/intelligence/latest');
+      const { count } = await latestRes.json();
+      lastIntelCheckCount = count;
+    } catch(e) {
+      lastIntelCheckCount = intelItems.length;
+    }
 
     const loadMoreBtn = document.getElementById('intel-load-more');
     if (intelItems.length >= 40) loadMoreBtn.classList.remove('hidden');

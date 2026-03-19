@@ -68,6 +68,78 @@ const HTML_SOURCES = [
       };
     },
   },
+  {
+    name: 'S&P Global',
+    url: 'https://www.spglobal.com/commodityinsights/en/market-insights/latest-news/oil',
+    itemSelector: 'article, .article-item, .news-item, .card',
+    extractFn: ($, el) => {
+      const headline = $(el).find('h2, h3, .headline, .title').first().text().trim();
+      const link = $(el).find('a').first().attr('href');
+      const summary = $(el).find('p, .summary, .description').first().text().trim();
+      if (!headline || headline.length < 10) return null;
+      return {
+        source: 'S&P Global',
+        source_url: link ? (link.startsWith('http') ? link : `https://www.spglobal.com${link}`) : null,
+        headline,
+        summary: summary.substring(0, 500) || null,
+        published_at: null,
+      };
+    },
+  },
+  {
+    name: 'EIA Weekly',
+    url: 'https://www.eia.gov/petroleum/weekly/',
+    itemSelector: '.release-item, .item, article, li.feature',
+    extractFn: ($, el) => {
+      const headline = $(el).find('a, h3, h4, .title').first().text().trim();
+      const link = $(el).find('a').first().attr('href');
+      const summary = $(el).find('p, .summary').first().text().trim();
+      if (!headline || headline.length < 10) return null;
+      return {
+        source: 'EIA Weekly',
+        source_url: link ? (link.startsWith('http') ? link : `https://www.eia.gov${link}`) : null,
+        headline,
+        summary: summary.substring(0, 500) || null,
+        published_at: null,
+      };
+    },
+  },
+  {
+    name: 'Vortexa',
+    url: 'https://www.vortexa.com/insights',
+    itemSelector: 'article, .blog-post, .post-item, .insight-card',
+    extractFn: ($, el) => {
+      const headline = $(el).find('h2, h3, .title, .headline').first().text().trim();
+      const link = $(el).find('a').first().attr('href');
+      const summary = $(el).find('p, .excerpt, .summary').first().text().trim();
+      if (!headline || headline.length < 10) return null;
+      return {
+        source: 'Vortexa',
+        source_url: link ? (link.startsWith('http') ? link : `https://www.vortexa.com${link}`) : null,
+        headline,
+        summary: summary.substring(0, 500) || null,
+        published_at: null,
+      };
+    },
+  },
+  {
+    name: 'Bloomberg Energy',
+    url: 'https://www.bloomberg.com/energy',
+    itemSelector: 'article, .story-package-module__story, .single-story-module',
+    extractFn: ($, el) => {
+      const headline = $(el).find('h3, h2, .headline, a').first().text().trim();
+      const link = $(el).find('a').first().attr('href');
+      const summary = $(el).find('p, .summary').first().text().trim();
+      if (!headline || headline.length < 10) return null;
+      return {
+        source: 'Bloomberg',
+        source_url: link ? (link.startsWith('http') ? link : `https://www.bloomberg.com${link}`) : null,
+        headline,
+        summary: summary.substring(0, 500) || null,
+        published_at: null,
+      };
+    },
+  },
 ];
 
 // ─── Keyword filters ────────────────────────────────────────────────────────
