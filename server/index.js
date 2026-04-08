@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ override: true });
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -27,6 +27,13 @@ async function runMigrations() {
     );
     await db.query(sql002);
     console.log('[server] Migration 002 applied');
+
+    const sql003 = fs.readFileSync(
+      path.join(__dirname, 'migrations', '003_daily_headlines.sql'),
+      'utf8'
+    );
+    await db.query(sql003);
+    console.log('[server] Migration 003 applied');
   } catch (err) {
     console.error('[server] Migration error:', err.message);
   }

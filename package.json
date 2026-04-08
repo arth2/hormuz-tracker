@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/arth2/hormuz-tracker#readme",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
     "axios": "^1.13.6",
     "cheerio": "^1.2.0",
     "csv-parse": "^6.1.0",

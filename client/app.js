@@ -133,6 +133,23 @@ async function loadDeficit() {
   document.getElementById('val-dollar-brent').textContent = `at $${formatNumber(brent, 2)}/bbl Brent`;
 }
 
+async function loadHeadline() {
+  try {
+    const data = await fetchJSON('/api/headline/current');
+    const card = document.getElementById('headline-card');
+    if (!data || !data.headline) {
+      if (card) card.classList.add('hidden');
+      return;
+    }
+    document.getElementById('headline-text').textContent = data.headline;
+    const ago = data.generated_at ? timeAgo(data.generated_at) : '';
+    document.getElementById('headline-meta').textContent = ago ? `AI-generated summary \u00B7 ${ago}` : 'AI-generated summary';
+    if (card) card.classList.remove('hidden');
+  } catch (e) {
+    // Headline is non-critical — hide on error
+  }
+}
+
 async function loadDeficitHistory() {
   const data = await fetchJSON('/api/deficit/history');
   if (!data || data.length === 0) return;
@@ -426,10 +443,9 @@ function toggleSection(sectionId) {
   section.classList.toggle('expanded');
   const toggle = document.getElementById(`toggle-${sectionId}`);
   if (toggle) toggle.textContent = section.classList.contains('expanded') ? '\u25BC' : '\u25B6';
-  // Lazy-render Gulf Index chart on first expand (Chart.js needs visible container)
+  // Lazy-render Gulf Index chart on expand (Chart.js needs visible container)
   if (sectionId === 'section-flaring' && section.classList.contains('expanded') && pendingGulfIndexData) {
-    renderGulfIndexChart(pendingGulfIndexData);
-    pendingGulfIndexData = null;
+    requestAnimationFrame(() => renderGulfIndexChart(pendingGulfIndexData));
   }
 }
 
@@ -438,6 +454,13 @@ function toggleTooltip(tooltipId) {
     if (t.id !== tooltipId) t.classList.remove('visible');
   });
   document.getElementById(tooltipId)?.classList.toggle('visible');
+}
+
+function toggleAboutBar(el) {
+  const content = el.nextElementSibling;
+  if (!content || !content.classList.contains('about-bar-content')) return;
+  const isHidden = content.classList.toggle('hidden');
+  el.querySelector('span').innerHTML = isHidden ? 'About this data &#9654;' : 'About this data &#9660;';
 }
 
 function toggleTooltipExpand(tooltipId) {
@@ -764,6 +787,12 @@ async function loadFlaring() {
     const indexData = await indexRes.json();
     pendingGulfIndexData = indexData;
 
+    // If flaring section is already expanded, render immediately
+    const flaringSection = document.getElementById('section-flaring');
+    if (flaringSection && flaringSection.classList.contains('expanded') && indexData.length > 0) {
+      requestAnimationFrame(() => renderGulfIndexChart(indexData));
+    }
+
     // 4. Compute trend arrow for collapsed header
     if (indexData.length >= 2) {
       const latest = parseFloat(indexData[indexData.length - 1].index_value);
@@ -912,6 +941,8 @@ async function checkIntelUpdate() {
       badge.classList.remove('hidden');
       badge.onclick = () => { loadIntelligence(); badge.classList.add('hidden'); };
     }
+    // Also refresh headline
+    loadHeadline();
   } catch(e) { /* silent */ }
 }
 
@@ -927,6 +958,7 @@ async function init() {
   // Load deficit data and history
   await loadDeficit();
   loadDeficitHistory();
+  loadHeadline();
   renderShutinChart();
 
   // Load all live market data panels via batch endpoint

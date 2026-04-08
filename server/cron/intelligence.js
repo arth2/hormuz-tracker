@@ -302,6 +302,10 @@ async function runIntelligence() {
   }
 
   console.log(`[intelligence] Run complete. Inserted ${totalInserted} new items.`);
+
+  // Generate headline if significant new articles arrived
+  const { maybeGenerateHeadline } = require('./headline');
+  await maybeGenerateHeadline();
 }
 
 module.exports.runIntelligence = runIntelligence;

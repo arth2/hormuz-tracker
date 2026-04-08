@@ -41,18 +41,44 @@
       <div class="card-unit" id="val-dollar-brent">at $&mdash;/bbl Brent</div>
     </div>
   </div>
+  <div id="headline-card" class="headline-card hidden">
+    <div class="headline-text" id="headline-text"></div>
+    <div class="headline-meta" id="headline-meta"></div>
+  </div>
   <div class="deficit-charts">
     <div class="chart-container">
       <div class="chart-title">AIS TANKER COUNT &mdash; STRAIT OF HORMUZ <span class="badge">Daily proxy</span></div>
+      <div class="about-bar" onclick="toggleAboutBar(this)">
+        <span>About this data &#9654;</span>
+      </div>
+      <div class="about-bar-content hidden">
+        <p>This chart tracks the number of tankers detected via AIS (Automatic Identification System) in the Strait of Hormuz corridor. Data is sourced daily from VesselFinder, which aggregates ship transponder signals. The pre-crisis baseline was approximately 37 VLCCs per day transiting the Strait.</p>
+        <p>This count serves as a directional proxy for shipping activity &mdash; fewer tankers suggest reduced throughput. It is not a direct measure of barrels per day and can be affected by weather, AIS signal gaps, and anchorage patterns. The tanker count contributes 30% of the blended throughput estimate used in the deficit calculation.</p>
+        <p class="about-bar-caveat">Note: Free AIS data sources do not support reliable geographic vessel counting. When AIS data is unavailable, the deficit calculator falls back to EIA-only throughput estimation.</p>
+      </div>
       <canvas id="chart-ais"></canvas>
     </div>
     <div class="chart-container">
       <div class="chart-title">CUMULATIVE SUPPLY DEFICIT (million barrels)</div>
+      <div class="about-bar" onclick="toggleAboutBar(this)">
+        <span>About this data &#9654;</span>
+      </div>
+      <div class="about-bar-content hidden">
+        <p>The deficit measures the daily crude oil supply shortfall from the Strait closure. It compares a pre-crisis baseline throughput of 20 mb/d against current estimated throughput, calculated using a blended model: 70% weighted on U.S. crude production data (EIA Weekly Petroleum Status Report) and 30% on AIS tanker activity.</p>
+        <p>The cumulative deficit is the running total since the crisis began on February 28, 2026. Dollar value is calculated by multiplying the cumulative barrel shortfall by the live Brent crude price (sourced from Twelve Data API with Yahoo Finance fallback).</p>
+      </div>
       <canvas id="chart-deficit"></canvas>
     </div>
   </div>
   <div class="shutin-section">
     <div class="chart-title">ESTIMATED CURTAILMENT BY COUNTRY (mb/d)</div>
+    <div class="about-bar" onclick="toggleAboutBar(this)">
+      <span>About this data &#9654;</span>
+    </div>
+    <div class="about-bar-content hidden">
+      <p>This chart shows estimated production curtailment per Gulf producer due to the Strait closure. The red portion represents shut-in production; the blue shows output that remains available (including volumes that can bypass the Strait via pipeline).</p>
+      <p>Iraq's southern fields are heavily Strait-dependent with no bypass. Saudi Arabia can reroute approximately 2 mb/d via the East&ndash;West (Petroline) pipeline to Yanbu. The UAE can bypass approximately 1.5 mb/d via the Habshan&ndash;Fujairah pipeline. Kuwait is primarily Strait-dependent. These are directional estimates, not verified official figures.</p>
+    </div>
     <canvas id="chart-shutin"></canvas>
   </div>
 </section>

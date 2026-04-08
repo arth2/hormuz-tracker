@@ -453,6 +453,23 @@ router.get('/intelligence/latest', async (req, res) => {
   }
 });
 
+// GET /api/headline/current — latest AI-generated headline
+router.get('/headline/current', async (req, res) => {
+  try {
+    const result = await db.query(
+      'SELECT headline, generated_at, model_used FROM daily_headlines ORDER BY generated_at DESC LIMIT 1'
+    );
+    if (result.rows.length > 0) {
+      res.json(result.rows[0]);
+    } else {
+      res.json({ headline: null });
+    }
+  } catch (err) {
+    console.error(err);
+    res.json({ headline: null });
+  }
+});
+
 // Admin manual triggers
 const { runEIA } = require('../cron/eia');
 const { runAIS } = require('../cron/ais');
